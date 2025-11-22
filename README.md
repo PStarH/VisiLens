@@ -96,7 +96,7 @@ graph LR
     A[User] -- Browser --> B[React Frontend]
     B -- WebSocket --> C[FastAPI Backend]
     C -- Python API --> D[VisiData Engine]
-    D -- Reads --> E[Local Files (CSV/Parquet/etc)]
+    D -- Reads --> E[Local Files (CSV, Parquet, etc)]
 ```
 
 ## 🛠 Development
