@@ -12,3 +12,4 @@ def test_read_main():
         "version": "0.1.0",
         "websocket": "/ws"
     }
+

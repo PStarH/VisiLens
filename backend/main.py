@@ -19,7 +19,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from core import (
-    ColumnInfo,
     DatasetHandle,
     get_current_dataset,
     load_dataset,
@@ -38,9 +37,13 @@ async def lifespan(app: FastAPI):
         try:
             dataset = load_dataset(str(test_csv))
             set_current_dataset(dataset)
-            logger.info(f"Auto-loaded test.csv: {dataset.row_count} rows, {dataset.column_count} columns")
+            logger.info(
+                "Auto-loaded test.csv: %d rows, %d columns",
+                dataset.row_count,
+                dataset.column_count,
+            )
         except Exception as e:
-            logger.warning(f"Could not auto-load test.csv: {e}")
+            logger.warning("Could not auto-load test.csv: %s", e)
     yield
 
 
@@ -332,38 +335,22 @@ class WebSocketHandler:
         """Route a command to the appropriate handler."""
         action = message.get("action")
 
-        if action == "get_columns":
-            await self.handle_get_columns()
-        elif action == "get_rows":
-            start = message.get("start", 0)
-            limit = message.get("limit", 50)
-            await self.handle_get_rows(start=start, limit=limit)
-        elif action == "get_info":
-            await self.handle_get_info()
-        elif action == "load":
-            path = message.get("path")
-            if path:
-                await self.handle_load(path)
-            else:
-                await self.send_error("Missing 'path' parameter", action="loaded")
-        elif action == "sort":
-            column = message.get("column")
-            ascending = message.get("ascending", True)
-            if column:
-                await self.handle_sort(column, ascending)
-            else:
-                await self.send_error("Missing 'column' parameter", action="sorted")
-        elif action == "filter":
-            column = message.get("column")
-            term = message.get("term", "")
-            if column:
-                await self.handle_filter(column, term)
-            else:
-                await self.send_error("Missing 'column' parameter", action="filtered")
-        elif action == "reset":
-            await self.handle_reset()
-        elif action == "ping":
-            await self.send_response("pong")
+        # Use a simple dispatch table to keep branching manageable for
+        # linters and maintainability. Handlers return coroutines.
+        handlers = {
+            "get_columns": lambda msg: self.handle_get_columns(),
+            "get_rows": lambda msg: self.handle_get_rows(msg.get("start", 0), msg.get("limit", 50)),
+            "get_info": lambda msg: self.handle_get_info(),
+            "load": lambda msg: self.handle_load(msg.get("path")) if msg.get("path") else self.send_error("Missing 'path' parameter", action="loaded"),
+            "sort": lambda msg: self.handle_sort(msg.get("column"), msg.get("ascending", True)) if msg.get("column") else self.send_error("Missing 'column' parameter", action="sorted"),
+            "filter": lambda msg: self.handle_filter(msg.get("column"), msg.get("term", "")) if msg.get("column") else self.send_error("Missing 'column' parameter", action="filtered"),
+            "reset": lambda msg: self.handle_reset(),
+            "ping": lambda msg: self.send_response("pong"),
+        }
+
+        handler = handlers.get(action)
+        if handler:
+            await handler(message)
         else:
             await self.send_error(f"Unknown action: {action}")
 
@@ -503,13 +490,12 @@ async def get_rows(
     )
 
 
-    # Serve static frontend files (for dev/production consistency)
-    static_dir = Path(__file__).parent.parent / "vdweb" / "static"
-    if static_dir.exists():
-        from fastapi.staticfiles import StaticFiles
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+# Serve static frontend files (for dev/production consistency)
+static_dir = Path(__file__).parent.parent / "vdweb" / "static"
+if static_dir.exists():
+    from fastapi.staticfiles import StaticFiles
 
-    return app
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 
 
 # For development: python -m uvicorn backend.main:app --reload

@@ -9,6 +9,6 @@ and virtualized scrolling for 1M+ rows.
 __version__ = "0.1.0"
 __author__ = "VisiLens Contributors"
 
-from .core import load_dataset, DatasetHandle, ColumnInfo
+from .core import load_dataset, DatasetHandle
 
-__all__ = ["load_dataset", "DatasetHandle", "ColumnInfo", "__version__"]
+__all__ = ["load_dataset", "DatasetHandle", "__version__"]
