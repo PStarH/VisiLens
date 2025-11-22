@@ -12,6 +12,7 @@
   [![VisiData Engine](https://img.shields.io/badge/Engine-VisiData-orange.svg)](https://www.visidata.org/)
   [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
   [![React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](https://reactjs.org/)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
   [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](#contributing)
 </div>
@@ -96,7 +97,7 @@ graph LR
     A[User] -- Browser --> B[React Frontend]
     B -- WebSocket --> C[FastAPI Backend]
     C -- Python API --> D[VisiData Engine]
-    D -- Reads --> E[Local Files (CSV, Parquet, etc)]
+    D -- Reads --> E["Local Files (CSV, Parquet, etc)"]
 ```
 
 ## 🛠 Development
