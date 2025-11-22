@@ -15,6 +15,7 @@ interface Row {
 interface WebSocketMessage {
   action: string;
   success: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   error?: string;
 }
@@ -41,6 +42,9 @@ export function useVisiLensSocket() {
   // Store rows in a map for random access by index
   // This is crucial for virtualization where we might receive chunks out of order
   const rowsMapRef = useRef<Map<number, Row>>(new Map());
+
+  // Use a ref to hold the connect function to avoid circular dependency in useCallback
+  const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
     try {
@@ -133,7 +137,7 @@ export function useVisiLensSocket() {
         setStatus('disconnected');
         wsRef.current = null;
         // Attempt reconnect after 3s
-        reconnectTimeoutRef.current = setTimeout(connect, 3000);
+        reconnectTimeoutRef.current = setTimeout(() => connectRef.current(), 3000);
       };
 
       ws.onerror = (e) => {
@@ -148,9 +152,19 @@ export function useVisiLensSocket() {
     }
   }, []);
 
+  // Update the ref whenever connect changes
   useEffect(() => {
-    connect();
+    connectRef.current = connect;
+  }, [connect]);
+
+  useEffect(() => {
+    // Use setTimeout to avoid synchronous state updates during render
+    const timer = setTimeout(() => {
+      connect();
+    }, 0);
+
     return () => {
+      clearTimeout(timer);
       if (wsRef.current) {
         wsRef.current.close();
       }

@@ -129,6 +129,7 @@ export function DataTable() {
   } = useVisiLensSocket();
 
   // Virtualizer for row virtualization
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: total,
     getScrollElement: () => parentRef.current,
