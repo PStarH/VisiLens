@@ -338,14 +338,45 @@ class WebSocketHandler:
         # Use a simple dispatch table to keep branching manageable for
         # linters and maintainability. Handlers return coroutines.
         handlers = {
-            "get_columns": lambda msg: self.handle_get_columns(),
-            "get_rows": lambda msg: self.handle_get_rows(msg.get("start", 0), msg.get("limit", 50)),
-            "get_info": lambda msg: self.handle_get_info(),
-            "load": lambda msg: self.handle_load(msg.get("path")) if msg.get("path") else self.send_error("Missing 'path' parameter", action="loaded"),
-            "sort": lambda msg: self.handle_sort(msg.get("column"), msg.get("ascending", True)) if msg.get("column") else self.send_error("Missing 'column' parameter", action="sorted"),
-            "filter": lambda msg: self.handle_filter(msg.get("column"), msg.get("term", "")) if msg.get("column") else self.send_error("Missing 'column' parameter", action="filtered"),
-            "reset": lambda msg: self.handle_reset(),
-            "ping": lambda msg: self.send_response("pong"),
+            "get_columns": (
+                lambda msg: self.handle_get_columns()
+            ),
+            "get_rows": (
+                lambda msg: self.handle_get_rows(
+                    msg.get("start", 0),
+                    msg.get("limit", 50),
+                )
+            ),
+            "get_info": (
+                lambda msg: self.handle_get_info()
+            ),
+            "load": (
+                lambda msg: self.handle_load(msg.get("path"))
+                if msg.get("path")
+                else self.send_error("Missing 'path' parameter", action="loaded")
+            ),
+            "sort": (
+                lambda msg: self.handle_sort(
+                    msg.get("column"),
+                    msg.get("ascending", True),
+                )
+                if msg.get("column")
+                else self.send_error("Missing 'column' parameter", action="sorted")
+            ),
+            "filter": (
+                lambda msg: self.handle_filter(
+                    msg.get("column"),
+                    msg.get("term", ""),
+                )
+                if msg.get("column")
+                else self.send_error("Missing 'column' parameter", action="filtered")
+            ),
+            "reset": (
+                lambda msg: self.handle_reset()
+            ),
+            "ping": (
+                lambda msg: self.send_response("pong")
+            ),
         }
 
         handler = handlers.get(action)
