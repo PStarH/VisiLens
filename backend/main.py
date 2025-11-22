@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from core import (
+from backend.core import (
     DatasetHandle,
     get_current_dataset,
     load_dataset,
