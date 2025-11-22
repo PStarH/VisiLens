@@ -1,0 +1,124 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+Thumbs.db
+ehthumbs.db
+
+# Python
+# virtual environments
+venv/
+.venv/
+env/
+env.bak/
+venv.bak/
+# byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+# distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+eggs/
+parts/
+var/
+wheels/
+*.egg
+# testing / coverage
+.coverage
+.coverage.*
+.cache
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+# tooling
+.mypy_cache/
+.pyre/
+.pytype/
+pylint.log
+# project files
+.python-version
+*.sqlite3
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+# build outputs
+dist/
+build/
+.out/
+.cache/
+.tmp/
+
+# Env files & secrets
+.env
+.env.*.local
+.env.local
+.local
+.secret
+secrets.yml
+
+# Claude AI config
+.claude
+.claude/
+
+# Editors & IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# OS generated files
+.DS_Store
+Icon?
+desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/
+.cache/
+
+# Misc
+*.bak
+*.swp
+*~
+*.orig
+
+# Python packaging
+*.egg
+*.egg-info
+dist/
+build/
+
+# Coverage and reports
+coverage.xml
+coverage/
+nosetests.xml
+junit-*.xml
+
+# Optional: lockfiles (usually you want to keep these, so commented out)
+# package-lock.json
+# yarn.lock
+
+# Data files (local-first)
+*.csv
+*.tsv
+*.parquet
+*.xlsx
+*.xls
+*.ods
+
+# Temporary scripts
+test_vd_script.py
