@@ -1,9 +1,7 @@
 """
-VisiLens FastAPI Backend
+VdWeb Server Module
 
-A minimal REST API exposing VisiData's data loading and querying
-capabilities. The browser is just a renderer - all logic lives here.
-Now with WebSocket support for real-time data exploration.
+FastAPI application serving both the WebSocket API and the static frontend.
 """
 
 from __future__ import annotations
@@ -16,9 +14,10 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from core import (
+from .core import (
     ColumnInfo,
     DatasetHandle,
     get_current_dataset,
@@ -29,36 +28,27 @@ from core import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global state for initial dataset (set by CLI)
+_initial_dataset_path: str | None = None
+
+
+def set_initial_dataset_path(path: str) -> None:
+    """Set the initial dataset path to load on startup."""
+    global _initial_dataset_path
+    _initial_dataset_path = path
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Auto-load test.csv if it exists (for demo purposes)."""
-    test_csv = Path(__file__).parent / "test.csv"
-    if test_csv.exists():
+    """Load the initial dataset if provided."""
+    if _initial_dataset_path:
         try:
-            dataset = load_dataset(str(test_csv))
+            dataset = load_dataset(_initial_dataset_path)
             set_current_dataset(dataset)
-            logger.info(f"Auto-loaded test.csv: {dataset.row_count} rows, {dataset.column_count} columns")
+            logger.info(f"Loaded dataset: {dataset.row_count} rows, {dataset.column_count} columns from {_initial_dataset_path}")
         except Exception as e:
-            logger.warning(f"Could not auto-load test.csv: {e}")
+            logger.error(f"Could not load dataset from {_initial_dataset_path}: {e}")
     yield
-
-
-app = FastAPI(
-    title="VisiLens API",
-    description="A fast, local-first API for exploring large datasets via VisiData",
-    version="0.1.0",
-    lifespan=lifespan,
-)
-
-# CORS middleware for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 # --- Response Models ---
@@ -234,10 +224,7 @@ class WebSocketHandler:
             return
 
         try:
-            # Apply sort
             dataset.sort_by_column(column, ascending)
-
-            # Return updated state and rows
             state = dataset.get_state()
             await self.send_response("sorted", {
                 "success": True,
@@ -245,14 +232,13 @@ class WebSocketHandler:
                 "total": dataset.row_count,
             })
 
-            # Also send the first chunk of sorted rows
             rows = dataset.get_rows(start=0, limit=100)
             await self.send_response("rows", {
                 "rows": rows,
                 "start": 0,
                 "limit": 100,
                 "total": dataset.row_count,
-                "reset": True  # Signal frontend to clear cache
+                "reset": True
             })
 
         except ValueError as e:
@@ -268,13 +254,11 @@ class WebSocketHandler:
             return
 
         try:
-            # Apply filter
-            if term.strip():  # Only filter if term is non-empty
+            if term.strip():
                 dataset.filter_by_column(column, term)
             else:
                 dataset.clear_filter()
 
-            # Return updated state and rows
             state = dataset.get_state()
             await self.send_response("filtered", {
                 "success": True,
@@ -282,14 +266,13 @@ class WebSocketHandler:
                 "total": dataset.row_count,
             })
 
-            # Send the filtered rows
             rows = dataset.get_rows(start=0, limit=100)
             await self.send_response("rows", {
                 "rows": rows,
                 "start": 0,
                 "limit": 100,
                 "total": dataset.row_count,
-                "reset": True  # Signal frontend to clear cache
+                "reset": True
             })
 
         except ValueError as e:
@@ -306,8 +289,6 @@ class WebSocketHandler:
 
         try:
             dataset.reset()
-
-            # Return updated state
             state = dataset.get_state()
             await self.send_response("reset", {
                 "success": True,
@@ -315,14 +296,13 @@ class WebSocketHandler:
                 "total": dataset.row_count,
             })
 
-            # Send rows from original state
             rows = dataset.get_rows(start=0, limit=100)
             await self.send_response("rows", {
                 "rows": rows,
                 "start": 0,
                 "limit": 100,
                 "total": dataset.row_count,
-                "reset": True  # Signal frontend to clear cache
+                "reset": True
             })
 
         except Exception as e:
@@ -368,151 +348,62 @@ class WebSocketHandler:
             await self.send_error(f"Unknown action: {action}")
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """
-    WebSocket endpoint for real-time data exploration.
-
-    Commands:
-    - {"action": "get_columns"} - Get column metadata
-    - {"action": "get_rows", "start": 0, "limit": 50} - Get row slice
-    - {"action": "get_info"} - Get dataset info
-    - {"action": "load", "path": "/path/to/file"} - Load dataset
-    - {"action": "ping"} - Connection health check
-    """
-    await websocket.accept()
-    handler = WebSocketHandler(websocket)
-    logger.info("WebSocket client connected")
-
-    try:
-        while True:
-            # Receive JSON message
-            try:
-                message = await websocket.receive_json()
-            except json.JSONDecodeError:
-                await handler.send_error("Invalid JSON")
-                continue
-
-            # Handle the command
-            await handler.handle_command(message)
-
-    except WebSocketDisconnect:
-        logger.info("WebSocket client disconnected")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-
-
-# --- REST Endpoints (kept for compatibility) ---
-
-@app.get("/", tags=["Health"])
-async def root():
-    """Health check endpoint."""
-    return {
-        "status": "ok",
-        "service": "VisiLens API",
-        "version": "0.1.0",
-        "websocket": "/ws"
-    }
-
-
-@app.post("/load", response_model=LoadResponse, tags=["Data"])
-async def load_data(request: LoadRequest):
-    """
-    Load a dataset from a local file path.
-
-    Supports 50+ formats via VisiData: CSV, TSV, JSON, Parquet,
-    SQLite, Excel, and more.
-    """
-    try:
-        dataset = load_dataset(request.path)
-        set_current_dataset(dataset)
-
-        columns = [
-            ColumnResponse(name=c.name, type=c.type, width=c.width)
-            for c in dataset.get_columns()
-        ]
-
-        return LoadResponse(
-            success=True,
-            message=f"Loaded {dataset.row_count} rows from {request.path}",
-            info=DatasetInfoResponse(
-                path=dataset.path,
-                row_count=dataset.row_count,
-                column_count=dataset.column_count,
-                columns=columns
-            )
-        )
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load: {e}")
-
-
-@app.get("/info", response_model=DatasetInfoResponse, tags=["Data"])
-async def get_info():
-    """Get metadata about the currently loaded dataset."""
-    dataset = _require_dataset()
-    columns = [
-        ColumnResponse(name=c.name, type=c.type, width=c.width)
-        for c in dataset.get_columns()
-    ]
-    return DatasetInfoResponse(
-        path=dataset.path,
-        row_count=dataset.row_count,
-        column_count=dataset.column_count,
-        columns=columns
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="VdWeb API",
+        description="A fast, local-first API for exploring large datasets via VisiData",
+        version="0.1.0",
+        lifespan=lifespan,
     )
 
-
-@app.get("/columns", response_model=ColumnsResponse, tags=["Data"])
-async def get_columns():
-    """
-    Get column headers and types from the loaded dataset.
-
-    Returns column metadata including name, inferred type,
-    and display width.
-    """
-    dataset = _require_dataset()
-    columns = [
-        ColumnResponse(name=c.name, type=c.type, width=c.width)
-        for c in dataset.get_columns()
-    ]
-    return ColumnsResponse(columns=columns, count=len(columns))
-
-
-@app.get("/rows", response_model=RowsResponse, tags=["Data"])
-async def get_rows(
-    start: int = Query(default=0, ge=0, description="Starting row index"),
-    limit: int = Query(default=50, ge=1, le=10000, description="Number of rows to return")
-):
-    """
-    Get a slice of rows from the loaded dataset.
-
-    Supports pagination via start/limit parameters.
-    All values are serialized to JSON-safe types.
-    """
-    dataset = _require_dataset()
-
-    rows = dataset.get_rows(start=start, limit=limit)
-
-    return RowsResponse(
-        rows=rows,
-        start=start,
-        limit=limit,
-        total=dataset.row_count
+    # CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
+    # WebSocket endpoint
+    @app.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        """WebSocket endpoint for real-time data exploration."""
+        await websocket.accept()
+        handler = WebSocketHandler(websocket)
+        logger.info("WebSocket client connected")
 
-    # Serve static frontend files (for dev/production consistency)
-    static_dir = Path(__file__).parent.parent / "vdweb" / "static"
+        try:
+            while True:
+                try:
+                    message = await websocket.receive_json()
+                except json.JSONDecodeError:
+                    await handler.send_error("Invalid JSON")
+                    continue
+
+                await handler.handle_command(message)
+
+        except WebSocketDisconnect:
+            logger.info("WebSocket client disconnected")
+        except Exception as e:
+            logger.error(f"WebSocket error: {e}")
+
+    # Serve static frontend files
+    # The static directory should contain the built React app
+    static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
-        from fastapi.staticfiles import StaticFiles
         app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+    else:
+        @app.get("/")
+        async def root():
+            return {
+                "error": "Frontend not built",
+                "message": "Run 'npm run build' in the frontend directory and copy dist/* to vdweb/static/"
+            }
 
     return app
 
 
-# For development: python -m uvicorn backend.main:app --reload
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+# For development: python -m uvicorn vdweb.server:app --reload
+app = create_app()

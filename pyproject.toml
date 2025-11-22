@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vdweb"
+version = "0.1.0"
+description = "Excel for Developers - A fast, local-first web GUI for exploring data with VisiData"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "VisiLens Contributors"}
+]
+keywords = ["visidata", "data", "csv", "parquet", "excel", "gui", "web", "fastapi", "virtualization"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "visidata>=3.0",
+    "click>=8.1.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/sampan/VisiLens"
+Repository = "https://github.com/sampan/VisiLens"
+Issues = "https://github.com/sampan/VisiLens/issues"
+
+[project.scripts]
+vdweb = "vdweb.cli:main"
+
+[tool.setuptools]
+packages = ["vdweb"]
+
+[tool.setuptools.package-data]
+vdweb = ["static/**/*"]

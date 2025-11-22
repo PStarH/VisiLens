@@ -1,120 +1,248 @@
-import { useRef } from 'react';
+/**
+ * VisiLens DataTable Component
+ *
+ * A high-performance virtualized data grid using TanStack Virtual.
+ * Communicates with the backend via WebSocket for real-time data.
+ */
+
+import { useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useQuery } from '@tanstack/react-query';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, WifiOff, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
 import clsx from 'clsx';
+import { useVisiLensSocket, type ConnectionStatus } from '../hooks/useVisiLensSocket';
 
-interface Column {
-  name: string;
-  type: string;
-  width?: number;
+// --- Constants ---
+
+const ROW_HEIGHT = 30;
+const HEADER_HEIGHT = 48;
+const COLUMN_WIDTH = 150;
+const OVERSCAN = 20;
+
+// --- Sub-components ---
+
+interface ConnectionStatusBadgeProps {
+  status: ConnectionStatus;
+  onReconnect: () => void;
 }
 
-interface Row {
-  [key: string]: unknown;
+function ConnectionStatusBadge({ status, onReconnect }: ConnectionStatusBadgeProps) {
+  if (status === 'connected') return null;
+
+  return (
+    <div className="absolute top-2 right-2 z-20 flex items-center gap-2 rounded bg-sidebar/90 px-3 py-1.5 text-xs backdrop-blur">
+      {status === 'connecting' && (
+        <>
+          <RefreshCw className="h-3 w-3 animate-spin text-accent" />
+          <span className="text-secondary">Connecting...</span>
+        </>
+      )}
+      {status === 'disconnected' && (
+        <>
+          <WifiOff className="h-3 w-3 text-yellow-500" />
+          <span className="text-secondary">Disconnected</span>
+          <button
+            onClick={onReconnect}
+            className="ml-2 rounded bg-accent/20 px-2 py-0.5 text-accent hover:bg-accent/30"
+          >
+            Retry
+          </button>
+        </>
+      )}
+      {status === 'error' && (
+        <>
+          <AlertCircle className="h-3 w-3 text-red-500" />
+          <span className="text-red-400">Connection Error</span>
+          <button
+            onClick={onReconnect}
+            className="ml-2 rounded bg-accent/20 px-2 py-0.5 text-accent hover:bg-accent/30"
+          >
+            Retry
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
-interface RowsResponse {
-  rows: Row[];
-  total: number;
+function SkeletonLoader() {
+  return (
+    <div className="flex h-full flex-col">
+      {/* Skeleton Header */}
+      <div className="h-12 w-full bg-sidebar border-b border-border skeleton-shimmer" />
+      {/* Skeleton Rows */}
+      <div className="flex-1 p-0">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-[30px] w-full border-b border-border/30 skeleton-shimmer"
+            style={{ animationDelay: `${i * 50}ms`, opacity: 1 - i * 0.03 }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
-interface ColumnsResponse {
-  columns: Column[];
-  count: number;
+interface ErrorDisplayProps {
+  message: string;
+  onRetry: () => void;
 }
 
-const API_BASE = 'http://localhost:8000';
+function ErrorDisplay({ message, onRetry }: ErrorDisplayProps) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-canvas text-center">
+      <AlertCircle className="h-12 w-12 text-red-500/50" />
+      <div>
+        <p className="font-mono text-sm text-red-400">{message}</p>
+        <p className="mt-1 text-xs text-secondary">
+          Make sure the backend is running on localhost:8000
+        </p>
+      </div>
+      <button
+        onClick={onRetry}
+        className="flex items-center gap-2 rounded bg-accent/20 px-4 py-2 text-sm text-accent hover:bg-accent/30"
+      >
+        <RefreshCw className="h-4 w-4" />
+        Retry Connection
+      </button>
+    </div>
+  );
+}
+
+// --- Main Component ---
 
 export function DataTable() {
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch Columns
-  const { 
-    data: columnsData, 
-    isLoading: isLoadingCols, 
-    error: colsError 
-  } = useQuery<ColumnsResponse>({
-    queryKey: ['columns'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE}/columns`);
-      if (!res.ok) throw new Error('Failed to fetch columns');
-      return res.json();
-    }
-  });
+  // WebSocket connection and data
+  const {
+    status,
+    error,
+    columns,
+    rows,
+    total,
+    isLoading,
+    fetchRows,
+    sortColumn,
+    sortState,
+    reconnect,
+  } = useVisiLensSocket();
 
-  // 2. Fetch Rows (Initial chunk)
-  // In a real app, we'd use infinite query or pagination based on scroll
-  const { 
-    data: rowsData, 
-    isLoading: isLoadingRows, 
-    error: rowsError 
-  } = useQuery<RowsResponse>({
-    queryKey: ['rows'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE}/rows?start=0&limit=10000`);
-      if (!res.ok) throw new Error('Failed to fetch rows');
-      return res.json();
-    }
-  });
-
-  const isLoading = isLoadingCols || isLoadingRows;
-  const error = colsError || rowsError;
-  const columns = columnsData?.columns || [];
-  const rows = rowsData?.rows || [];
-
-  // 3. Virtualizer
+  // Virtualizer for row virtualization
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: total,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 30, // Fixed 30px row height
-    overscan: 20,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
   });
 
-  if (isLoading) {
+  // Track visible range and fetch data when it changes
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const visibleStartIndex = virtualItems[0]?.index ?? 0;
+  const visibleEndIndex = virtualItems[virtualItems.length - 1]?.index ?? 0;
+
+  // Fetch rows when visible range changes (debounced via effect)
+  const lastFetchRef = useRef({ start: -1, end: -1 });
+
+  const fetchVisibleRows = useCallback(() => {
+    // Calculate the range we need (with some buffer)
+    const buffer = OVERSCAN * 2;
+    const start = Math.max(0, visibleStartIndex - buffer);
+    const end = Math.min(total, visibleEndIndex + buffer);
+    const limit = end - start + 1;
+
+    // Skip if we already have this data
+    if (lastFetchRef.current.start === start && lastFetchRef.current.end === end) {
+      return;
+    }
+
+    // Check if we need to fetch (if any row in range is missing)
+    let needsFetch = false;
+    if (rows.length === 0) {
+      needsFetch = true;
+    } else {
+      for (let i = start; i < end; i++) {
+        if (!rows[i]) {
+          needsFetch = true;
+          break;
+        }
+      }
+    }
+
+    if (needsFetch && status === 'connected' && limit > 0) {
+      lastFetchRef.current = { start, end };
+      fetchRows(start, limit);
+    }
+  }, [visibleStartIndex, visibleEndIndex, total, rows, status, fetchRows]);
+
+  useEffect(() => {
+    // Debounce fetch requests
+    const timer = setTimeout(fetchVisibleRows, 50);
+    return () => clearTimeout(timer);
+  }, [fetchVisibleRows]);
+
+  // --- Render States ---
+
+  // Show skeleton while initially loading
+  if (isLoading && rows.length === 0) {
     return (
-      <div className="flex h-full flex-col">
-        {/* Skeleton Header */}
-        <div className="h-12 w-full bg-sidebar border-b border-border skeleton-shimmer" />
-        {/* Skeleton Rows */}
-        <div className="flex-1 p-0">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[30px] w-full border-b border-border/30 skeleton-shimmer"
-              style={{ animationDelay: `${i * 50}ms`, opacity: 1 - i * 0.03 }}
-            />
-          ))}
-        </div>
+      <div className="relative h-full">
+        <ConnectionStatusBadge status={status} onReconnect={reconnect} />
+        <SkeletonLoader />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex h-full items-center justify-center text-red-400 bg-canvas">
-        <AlertCircle className="mr-2 h-5 w-5" />
-        <span className="font-mono text-sm">Error: {error instanceof Error ? error.message : 'Unknown error'}</span>
-      </div>
-    );
+  // Show error state
+  if (error && rows.length === 0) {
+    return <ErrorDisplay message={error} onRetry={reconnect} />;
   }
+
+  // --- Main Grid Render ---
 
   return (
-    <div className="flex h-full flex-col bg-surface text-primary font-mono text-sm">
+    <div className="relative flex h-full flex-col bg-surface text-primary font-mono text-sm">
+      {/* Connection Status Badge */}
+      <ConnectionStatusBadge status={status} onReconnect={reconnect} />
+
       {/* Header - Sticky */}
-      <div className="flex border-b border-border bg-sidebar z-10 shrink-0">
-        {columns.map((col) => (
-          <div
-            key={col.name}
-            className="flex h-[48px] items-center px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none"
-            style={{ width: 150, minWidth: 150 }}
-          >
-            <div className="flex flex-col gap-0.5 truncate">
-              <span>{col.name}</span>
-              <span className="text-[10px] text-secondary/50 font-normal lowercase">{col.type}</span>
-            </div>
-          </div>
-        ))}
+      <div
+        className="flex border-b border-border bg-sidebar z-10 shrink-0"
+        style={{ height: HEADER_HEIGHT }}
+      >
+        {columns.map((col) => {
+          const isSorted = sortState?.column === col.name;
+          const isAscending = sortState?.ascending ?? true;
+
+          return (
+            <button
+              key={col.name}
+              onClick={() => {
+                // Toggle sort direction if clicking the same column
+                const ascending = isSorted ? !isAscending : true;
+                sortColumn(col.name, ascending);
+              }}
+              className="flex items-center justify-between px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none hover:bg-row-hover/50 transition-colors cursor-pointer text-left"
+              style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+            >
+              <div className="flex flex-col gap-0.5 truncate">
+                <span>{col.name}</span>
+                <span className="text-[10px] text-secondary/50 font-normal lowercase">
+                  {col.type}
+                </span>
+              </div>
+              {isSorted && (
+                <div className="ml-2 shrink-0">
+                  {isAscending ? (
+                    <ArrowUp className="h-3 w-3 text-accent" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3 text-accent" />
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Virtualized Body */}
@@ -125,19 +253,48 @@ export function DataTable() {
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
-            width: 'max-content', // Allow horizontal scroll if needed
+            width: 'max-content',
             minWidth: '100%',
             position: 'relative',
           }}
         >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          {virtualItems.map((virtualRow) => {
             const row = rows[virtualRow.index];
+
+            // Show skeleton for rows not yet loaded
+            if (!row) {
+              return (
+                <div
+                  key={virtualRow.index}
+                  className="flex border-b border-border/30 bg-surface/30"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    width: columns.length * COLUMN_WIDTH,
+                  }}
+                >
+                  {columns.map((col) => (
+                    <div
+                      key={col.name}
+                      className="flex items-center px-4 border-r border-border/30 last:border-r-0"
+                      style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+                    >
+                      <div className="h-3 w-3/4 rounded bg-border/30 skeleton-shimmer" />
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
             return (
               <div
                 key={virtualRow.index}
                 className={clsx(
                   "flex border-b border-border/50 hover:bg-row-hover transition-colors duration-75",
-                  virtualRow.index % 2 === 0 ? "bg-surface" : "bg-surface/50" // Subtle striping
+                  virtualRow.index % 2 === 0 ? "bg-surface" : "bg-surface/50"
                 )}
                 style={{
                   position: 'absolute',
@@ -151,7 +308,7 @@ export function DataTable() {
                   <div
                     key={col.name}
                     className="flex items-center px-4 border-r border-border/30 last:border-r-0 text-[13px] text-primary/90 whitespace-nowrap overflow-hidden"
-                    style={{ width: 150, minWidth: 150 }}
+                    style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
                     title={String(row[col.name] ?? '')}
                   >
                     <span className="truncate w-full">
@@ -167,4 +324,3 @@ export function DataTable() {
     </div>
   );
 }
-
