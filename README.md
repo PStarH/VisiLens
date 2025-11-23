@@ -9,11 +9,6 @@
   
   A fast, local-first web GUI for exploring data with [VisiData](https://www.visidata.org/).
 
-  ```bash
-  pip install vdweb
-  vdweb data.csv
-  ```
-
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![VisiData Engine](https://img.shields.io/badge/Engine-VisiData-orange.svg)](https://www.visidata.org/)
