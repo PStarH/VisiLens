@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/banner.svg" alt="VisiLens Logo" width="100%" />
+  <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/banner.svg" alt="VisiLens Logo" width="100%" />
   
   # VisiLens
 
@@ -15,6 +15,7 @@
   [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
   [![React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](https://reactjs.org/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+  [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/0.1.1/)
 
   [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](#contributing)
 </div>
@@ -107,7 +108,7 @@ VisiLens is built on a robust modern stack designed for performance:
 *   **Communication:** WebSockets stream slices on demand.
 *   **Frontend:** React grid renders only what you see.
 
-![Architecture Diagram](assets/diagram.png)
+![Architecture Diagram](https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/diagram.png)
 
 ## 🗺 Roadmap
 
@@ -205,3 +206,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
   Made with ❤️ by <a href="https://github.com/PStarH">PStarH</a> and the Open Source Community.
 </div>
+
+
+

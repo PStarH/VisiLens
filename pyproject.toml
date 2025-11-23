@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vdweb"
-version = "0.1.0"
+version = "0.1.1"
 description = "Excel for Developers - A fast, local-first web GUI for exploring data with VisiData"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license-files = []
 authors = [
     {name = "VisiLens Contributors"}
 ]

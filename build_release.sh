@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e  # Exit on error
+set -e
 
 echo "🚀 Starting VisiLens v0.1.0 Build Protocol..."
 
@@ -13,15 +13,13 @@ cd ..
 # 2. Prepare Static Assets
 echo "📂 Copying assets to vdweb/static..."
 mkdir -p vdweb/static
-# Clean old assets
-rm -rf vdweb/static/*
-# Copy new assets
+find vdweb/static -mindepth 1 -delete
 cp -r frontend/dist/* vdweb/static/
 
 # 3. Build Python Package
 echo "🐍 Building Python Package..."
-# Ensure build tool is installed
 python -m pip install --upgrade build
+rm -rf dist/*
 python -m build
 
 echo "✅ Build Complete! Artifacts are in dist/"
