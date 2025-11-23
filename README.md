@@ -4,8 +4,15 @@
   # VisiLens
 
   **Excel for Developers**
+
+  > **Open 1M+ rows in seconds. Local, fast, simple.**
   
   A fast, local-first web GUI for exploring data with [VisiData](https://www.visidata.org/).
+
+  ```bash
+  pip install vdweb
+  vdweb data.csv
+  ```
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -21,18 +28,18 @@
 
 ## 🚀 Why VisiLens?
 
-Data exploration shouldn't require writing boilerplate Pandas code or waiting for heavy spreadsheet software to load. **VisiLens** combines the raw speed and power of **VisiData** with a modern, intuitive web interface.
+Data exploration shouldn't require writing boilerplate Pandas code or waiting for heavy spreadsheet software to load. **VisiLens** combines the raw speed and power of **VisiData** with a lightweight web interface.
 
-- **⚡️ Blazing Fast:** Powered by VisiData's highly optimized engine. Handle millions of rows with ease.
-- **🔒 Local-First:** Your data never leaves your machine. No cloud uploads, no privacy concerns.
-- **🛠 Developer Friendly:** CLI-first workflow. Pipe data in, explore, and get back to coding.
+- **⚡️ Load 1M rows in under 2 seconds:** Powered by VisiData's highly optimized engine.
+- **🔒 All local:** Your data never leaves your machine. No cloud uploads.
+- **🛠 Zero config:** CLI-first workflow. Pipe data in, explore, and get back to coding.
 - **🔌 Universal Support:** Open CSV, TSV, JSON, Parquet, Excel, SQLite, and [50+ other formats](https://www.visidata.org/formats/).
 
 ## ✨ Features
 
 - **Instant Visualization:** Just run `vdweb data.csv` and start exploring.
-- **Real-time Sorting & Filtering:** Filter millions of rows instantly via WebSockets.
-- **Modern Data Grid:** A clean, responsive React-based table view.
+- **Backend-powered Sorting & Filtering:** Sorting and filtering happen on the backend via VisiData.
+- **Lightweight Data Grid:** A virtualized React-based table view.
 - **Zero Config:** No database setup or complex configuration required.
 
 ### 📂 Supported Formats
@@ -53,7 +60,7 @@ We take performance seriously. Here is how VisiLens compares when opening a **1,
 | **Pandas-based GUI** | > 15s (Cold Start) | High (Entire DF in RAM) | Sluggish (Non-Virtualized) |
 | Jupyter (print df) | Fast | Medium | Static Text |
 
-*Test Data: 1M rows, 3 columns (Mixed types).*
+*Test Data: 1M rows, 3 columns (Mixed types). Numbers are from my MacBook Air M2 during real development use.*
 
 ## 📦 Installation
 
@@ -101,15 +108,9 @@ Once launched, VisiLens opens in your default browser (usually `http://localhost
 
 VisiLens is built on a robust modern stack designed for performance:
 
-*   **Backend:** [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/)
-    *   Acts as a bridge to the VisiData core.
-    *   Manages WebSocket connections for real-time state updates.
-*   **Engine:** [VisiData](https://www.visidata.org/)
-    *   Handles all data loading, parsing, sorting, and filtering.
-    *   Provides the "metal" for high-performance data manipulation.
-*   **Frontend:** [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [Tailwind CSS](https://tailwindcss.com/)
-    *   A lightweight Single Page Application (SPA).
-    *   Uses a virtualized data grid to render only what you see.
+*   **Backend:** FastAPI server bridges VisiData and the browser.
+*   **Communication:** WebSockets stream slices on demand.
+*   **Frontend:** React grid renders only what you see.
 
 ![Architecture Diagram](assets/diagram.png)
 
@@ -119,6 +120,7 @@ We are actively working on making VisiLens the ultimate local data companion.
 
 - [x] **v0.1:** Core Engine, Virtual Scrolling, Sorting, Filtering.
 - [ ] **Jupyter Integration:** Launch VisiLens directly from a notebook cell (`visilens.view(df)`).
+- [ ] **Drag-and-drop file loading**
 - [ ] **Plotting:** Quick histograms and scatter plots via Vega-Lite.
 - [ ] **Editing:** Edit cells and save changes back to CSV/Parquet.
 - [ ] **SQL Support:** Connect directly to SQLite/Postgres/DuckDB.
