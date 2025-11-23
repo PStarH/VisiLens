@@ -48,7 +48,7 @@ We take performance seriously. Here is how VisiLens compares when opening a **1,
 
 | Tool | Load Time (1M Rows) | Memory Footprint | Interactive Sorting |
 | :--- | :--- | :--- | :--- |
-| **VisiLens** | **~2.0s** | **Minimal (< 50MB Total)** | **Instant** (Backend: ~1.2s) |
+| **VisiLens** | **~1.7s** | **Minimal (< 50MB Total)** | **Instant** (Backend: < 0.4s) |
 | Excel | > 30s (Often Fails) | High (Blocking RAM) | Slow/Unresponsive |
 | **Pandas-based GUI** | > 15s (Cold Start) | High (Entire DF in RAM) | Sluggish (Non-Virtualized) |
 | Jupyter (print df) | Fast | Medium | Static Text |
