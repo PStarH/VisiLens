@@ -111,13 +111,7 @@ VisiLens is built on a robust modern stack designed for performance:
     *   A lightweight Single Page Application (SPA).
     *   Uses a virtualized data grid to render only what you see.
 
-```mermaid
-graph LR
-    A[User] -- Browser --> B[React Frontend]
-    B -- WebSocket --> C[FastAPI Backend]
-    C -- Python API --> D[VisiData Engine]
-    D -- Reads --> E["Local Files (CSV, Parquet, etc)"]
-```
+![Architecture Diagram](assets/diagram.png)
 
 ## 🗺 Roadmap
 
