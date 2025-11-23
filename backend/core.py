@@ -90,17 +90,37 @@ class DatasetHandle:
             columns = self.sheet.columns
 
             result = []
+            
+            # Optimization: Pre-calculate column indices for fast access
+            # Only for columns that are ItemColumn (have 'expr' as int index)
+            col_indices = []
+            for col in columns:
+                if hasattr(col, 'expr') and isinstance(col.expr, int):
+                    col_indices.append((col.name, col.expr, True))
+                else:
+                    col_indices.append((col.name, col, False))
+
             for row in rows:
                 row_dict = {}
-                for col in columns:
+                # Fast path check: if row is a list, we can use direct index access
+                is_list_row = isinstance(row, list)
+                
+                for name, col_or_idx, is_index in col_indices:
                     try:
-                        # Get the typed value from VisiData
-                        value = col.getTypedValue(row)
-                        # Ensure JSON serializable
-                        row_dict[col.name] = _serialize_value(value)
+                        if is_list_row and is_index:
+                            # Fast path: direct list access
+                            # We assume data is already converted by _convert_column_data
+                            val = row[col_or_idx]
+                            row_dict[name] = _serialize_value(val)
+                        else:
+                            # Slow path: use VisiData getter
+                            col = col_or_idx
+                            value = col.getTypedValue(row)
+                            row_dict[name] = _serialize_value(value)
                     except Exception:
                         # Fallback to display value on any error
-                        row_dict[col.name] = col.getDisplayValue(row)
+                        col = col_or_idx if not is_index else next(c for c in columns if c.name == name)
+                        row_dict[name] = col.getDisplayValue(row)
                 result.append(row_dict)
             return result
 
@@ -442,15 +462,33 @@ def _convert_column_data(col: Any, rows: list[Any]) -> None:
     Convert column data to the column's type.
     This ensures that the underlying data matches the metadata type.
     """
-    for row in rows:
-        try:
-            # getTypedValue uses the column's type to convert the raw value
-            val = col.getTypedValue(row)
-            # setValue updates the underlying storage (e.g. the list representing the row)
-            col.setValue(row, val)
-        except Exception:
-            # Leave original value on error
-            pass
+    # Optimization: Fast path for standard list-based rows (like CSV)
+    # col.expr holds the index for ItemColumn in VisiData
+    if hasattr(col, 'expr') and isinstance(col.expr, int) and rows and isinstance(rows[0], list):
+        idx = col.expr
+        type_func = col.type
+        
+        for row in rows:
+            try:
+                val = row[idx]
+                # Only convert if it's a string (or not already the right type)
+                # and not None/empty. 
+                # We check for str specifically to avoid re-converting already converted values
+                if isinstance(val, str) and val:
+                    row[idx] = type_func(val)
+            except (ValueError, TypeError, IndexError):
+                pass
+    else:
+        # Fallback for other row types or complex columns
+        for row in rows:
+            try:
+                # getTypedValue uses the column's type to convert the raw value
+                val = col.getTypedValue(row)
+                # setValue updates the underlying storage (e.g. the list representing the row)
+                col.setValue(row, val)
+            except Exception:
+                # Leave original value on error
+                pass
 
 
 # Module-level dataset cache for the simple demo
