@@ -36,7 +36,7 @@ export function useVisiLensSocket() {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<Map<number, Row>>(new Map());
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [sortState, setSortState] = useState<SortState | null>(null);
@@ -96,15 +96,9 @@ export function useVisiLensSocket() {
                 rowsMapRef.current.set(start + index, row);
               });
 
-              // Convert map to array (sparse)
-              // We create an array of size 'total' and fill it with known rows
-              const sparseRows = new Array(totalRows);
-              rowsMapRef.current.forEach((row, index) => {
-                if (index < totalRows) {
-                  sparseRows[index] = row;
-                }
-              });
-              setRows(sparseRows);
+              // Update state with a new Map to trigger re-render
+              // This is much more efficient than creating a sparse array of size 'total'
+              setRows(new Map(rowsMapRef.current));
               break;
             }
             case 'sorted': {
@@ -120,6 +114,7 @@ export function useVisiLensSocket() {
             case 'filtered': {
               // Clear rows map - will be refilled with filtered data
               rowsMapRef.current.clear();
+              setRows(new Map());
               setTotal(message.data.total);
               if (message.data.state?.filter) {
                 setFilterState({
@@ -136,6 +131,7 @@ export function useVisiLensSocket() {
               setSortState(null);
               setFilterState(null);
               rowsMapRef.current.clear();
+              setRows(new Map());
               setTotal(message.data.total);
               break;
             }

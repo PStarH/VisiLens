@@ -159,11 +159,11 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
 
     // Check if we need to fetch (if any row in range is missing)
     let needsFetch = false;
-    if (rows.length === 0) {
+    if (rows.size === 0) {
       needsFetch = true;
     } else {
       for (let i = start; i < end; i++) {
-        if (!rows[i]) {
+        if (!rows.has(i)) {
           needsFetch = true;
           break;
         }
@@ -185,7 +185,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
   // --- Render States ---
 
   // Show skeleton while initially loading
-  if (isLoading && rows.length === 0) {
+  if (isLoading && rows.size === 0) {
     return (
       <div className="relative h-full">
         <ConnectionStatusBadge status={status} onReconnect={reconnect} />
@@ -195,7 +195,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
   }
 
   // Show error state
-  if (error && rows.length === 0) {
+  if (error && rows.size === 0) {
     return <ErrorDisplay message={error} onRetry={reconnect} />;
   }
 
@@ -274,7 +274,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
           }}
         >
           {virtualItems.map((virtualRow) => {
-            const row = rows[virtualRow.index];
+            const row = rows.get(virtualRow.index);
 
             // Show skeleton for rows not yet loaded
             if (!row) {
