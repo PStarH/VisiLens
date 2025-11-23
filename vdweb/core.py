@@ -147,32 +147,63 @@ class DatasetHandle:
             if col is None:
                 raise ValueError(f"Column '{column_name}' not found")
 
-            # Sort rows using VisiData's column value getter
-            # Handle potential errors in getTypedValue by falling back to string comparison
-            def sort_key(row: Any) -> Any:
-                try:
-                    val = col.getTypedValue(row)
-                    # Handle None values (sort them to the end)
-                    if val is None:
-                        return (2, None) if ascending else (0, None)
-                    
-                    # Check if value matches column type (e.g. float)
-                    # If column type is float but val is string (conversion failed),
-                    # we treat it as a different group to avoid comparison errors.
-                    if isinstance(val, (int, float)):
-                        return (0, val)
-                    else:
-                        # Failed conversion or other type
+            # Optimization: Fast path for list-based rows (CSV)
+            # Direct index access avoids VisiData's getter overhead
+            if hasattr(col, 'expr') and isinstance(col.expr, int) and self.sheet.rows and isinstance(self.sheet.rows[0], list):
+                idx = col.expr
+                
+                # Define key function optimized for direct access
+                # We use a tuple (type_group, value) to handle mixed types safely
+                # Group 0: Numbers (int, float)
+                # Group 1: Strings/Others
+                # Group 2: None (always last if ascending)
+                
+                # Pre-calculate constants to avoid closure lookup overhead
+                NONE_KEY = (2, None) if ascending else (0, None)
+                
+                def fast_key(row):
+                    try:
+                        val = row[idx]
+                        if val is None:
+                            return NONE_KEY
+                        
+                        if isinstance(val, (int, float)):
+                            return (0, val)
+                        
+                        # Fallback for strings or other types
                         return (1, str(val))
-                except Exception:
-                    # Fallback to display value for comparison
-                    return (1, col.getDisplayValue(row))
+                    except IndexError:
+                        return NONE_KEY
 
-            self.sheet.rows = sorted(
-                self.sheet.rows,
-                key=sort_key,
-                reverse=not ascending
-            )
+                # In-place sort is slightly faster than sorted()
+                self.sheet.rows.sort(key=fast_key, reverse=not ascending)
+
+            else:
+                # Slow path: use VisiData's column value getter
+                # Handle potential errors in getTypedValue by falling back to string comparison
+                def sort_key(row: Any) -> Any:
+                    try:
+                        val = col.getTypedValue(row)
+                        # Handle None values (sort them to the end)
+                        if val is None:
+                            return (2, None) if ascending else (0, None)
+                        
+                        # Check if value matches column type (e.g. float)
+                        # If column type is float but val is string (conversion failed),
+                        # we treat it as a different group to avoid comparison errors.
+                        if isinstance(val, (int, float)):
+                            return (0, val)
+                        else:
+                            # Failed conversion or other type
+                            return (1, str(val))
+                    except Exception:
+                        # Fallback to display value for comparison
+                        return (1, col.getDisplayValue(row))
+
+                self.sheet.rows.sort(
+                    key=sort_key,
+                    reverse=not ascending
+                )
 
             # Track current sort state
             self._current_sort = (column_name, ascending)
