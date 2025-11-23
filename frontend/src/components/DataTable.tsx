@@ -240,14 +240,12 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
           const isAscending = sortState?.ascending ?? true;
           const isFiltered = filterState?.column === col.name;
           const isFiltering = activeFilterColumn === col.name;
-          const isNumber = ['integer', 'float', 'currency'].includes(col.type);
 
           return (
             <div
               key={col.name}
               className={clsx(
                 "group flex items-center px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none transition-colors",
-                isNumber ? "justify-end text-right" : "justify-between text-left",
                 isFiltering ? "bg-surface" : "hover:bg-row-hover/50"
               )}
               style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
@@ -268,15 +266,13 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                       }
                     }}
                     onBlur={() => {
-                      // Close on blur if empty, otherwise keep open?
-                      // For now, just close to be safe
                       setActiveFilterColumn(null);
                     }}
                     className="h-6 w-full rounded border border-accent/50 bg-canvas px-2 text-xs text-primary focus:border-accent focus:outline-none"
                     placeholder="Filter..."
                   />
                   <button
-                    onMouseDown={(e) => e.preventDefault()} // Prevent blur
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setActiveFilterColumn(null)}
                     className="text-secondary hover:text-primary"
                   >
@@ -284,36 +280,23 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                   </button>
                 </div>
               ) : (
-                <>
+                <div className="flex w-full items-center justify-between gap-2">
                   <div
-                    className={clsx(
-                      "flex flex-col gap-0.5 truncate cursor-pointer flex-1",
-                      isNumber && "items-end"
-                    )}
+                    className="flex min-w-0 cursor-pointer flex-col gap-0.5"
                     onClick={() => {
                       const ascending = isSorted ? !isAscending : true;
                       sortColumn(col.name, ascending);
                     }}
                   >
-                    <span>{col.name}</span>
-                    <span className="text-[10px] text-secondary/50 font-normal lowercase">
+                    <span className="truncate text-left">{col.name}</span>
+                    <span className="text-left text-[10px] font-normal lowercase text-secondary/50">
                       {col.type}
                     </span>
                   </div>
 
-                  <div className={clsx("flex items-center gap-1", isNumber && "order-first mr-2")}>
-                    {isSorted && !isNumber && (
-                      <div className="shrink-0 ml-2">
-                        {isAscending ? (
-                          <ArrowUp className="h-3 w-3 text-accent" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3 text-accent" />
-                        )}
-                      </div>
-                    )}
-                    
-                    {isSorted && isNumber && (
-                      <div className="shrink-0 mr-2">
+                  <div className="flex items-center gap-1">
+                    {isSorted && (
+                      <div className="shrink-0">
                         {isAscending ? (
                           <ArrowUp className="h-3 w-3 text-accent" />
                         ) : (
@@ -326,7 +309,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          filterColumn(col.name, ''); // Clear filter
+                          filterColumn(col.name, '');
                         }}
                         className="flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent/20"
                         title={`Filtered by: ${filterState?.term}`}
@@ -348,7 +331,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                       </button>
                     )}
                   </div>
-                </>
+                </div>
               )}
             </div>
           );
@@ -415,13 +398,11 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                 }}
               >
                 {columns.map((col) => {
-                  const isNumber = ['integer', 'float', 'currency'].includes(col.type);
                   return (
                     <div
                       key={col.name}
                       className={clsx(
-                        "flex items-center px-4 border-r border-border/30 last:border-r-0 text-[13px] text-primary/90 whitespace-nowrap overflow-hidden",
-                        isNumber ? "justify-end text-right" : "justify-start text-left"
+                        "flex items-center px-4 border-r border-border/30 last:border-r-0 text-[13px] text-primary/90 whitespace-nowrap overflow-hidden justify-start text-left"
                       )}
                       style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
                       title={String(row[col.name] ?? '')}
