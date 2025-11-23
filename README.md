@@ -17,6 +17,8 @@
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
   [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/0.1.1/)
 
+  [English](README.md) • [简体中文](DOCUMENTATION/README_zh.md) • [Español](DOCUMENTATION/README_es.md) • [日本語](DOCUMENTATION/README_ja.md) • [Русский](DOCUMENTATION/README_ru.md)
+
   [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](#contributing)
 </div>
 
@@ -184,6 +186,8 @@ Want to contribute? Great! Here's how to set up the development environment.
   ```
 
 ## 🤝 Contributing
+
+For more details, please see [CONTRIBUTING.md](DOCUMENTATION/CONTRIBUTING.md).
 
 ### For Contributors: where things live
 
