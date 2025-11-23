@@ -7,7 +7,7 @@
 
   > **Open 1M+ rows in seconds. Local, fast, simple.**
   
-  A fast, local-first web GUI for exploring data with [VisiData](https://www.visidata.org/).
+  A high-performance, local-first web GUI for exploring datasets. Instantly view and filter CSV, Parquet, Excel, and JSON files using the power of [VisiData](https://www.visidata.org/).
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -23,7 +23,7 @@
 
 ## 🚀 Why VisiLens?
 
-Data exploration shouldn't require writing boilerplate Pandas code or waiting for heavy spreadsheet software to load. **VisiLens** combines the raw speed and power of **VisiData** with a lightweight web interface.
+Data exploration shouldn't require writing boilerplate Pandas code or waiting for heavy spreadsheet software like Excel to load. **VisiLens** is a modern **CSV viewer** and **Parquet explorer** that combines the raw speed of **VisiData** with a lightweight web interface.
 
 - **⚡️ Load 1M rows in under 2 seconds:** Powered by VisiData's highly optimized engine.
 - **🔒 All local:** Your data never leaves your machine. No cloud uploads.
@@ -32,10 +32,10 @@ Data exploration shouldn't require writing boilerplate Pandas code or waiting fo
 
 ## ✨ Features
 
-- **Instant Visualization:** Just run `vdweb data.csv` and start exploring.
-- **Backend-powered Sorting & Filtering:** Sorting and filtering happen on the backend via VisiData.
-- **Lightweight Data Grid:** A virtualized React-based table view.
-- **Zero Config:** No database setup or complex configuration required.
+- **Instant Data Visualization:** Just run `vdweb data.csv` to visualize large datasets instantly.
+- **Backend-powered Sorting & Filtering:** Perform complex queries on millions of rows using the VisiData engine.
+- **Lightweight Data Grid:** A virtualized React-based table view for smooth scrolling.
+- **Zero Config:** No database setup required. Works as a standalone CSV/Parquet viewer.
 
 ### 📂 Supported Formats
 VisiLens leverages VisiData's loaders to support a wide range of formats out of the box:
@@ -134,7 +134,7 @@ Want to contribute? Great! Here's how to set up the development environment.
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/sampan/VisiLens.git
+    git clone https://github.com/PStarH/VisiLens.git
     cd VisiLens
     ```
 
@@ -174,5 +174,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  Made with ❤️ by <a href="https://github.com/sampan">Sampan</a> and the Open Source Community.
+  Made with ❤️ by <a href="https://github.com/PStarH">PStarH</a> and the Open Source Community.
 </div>

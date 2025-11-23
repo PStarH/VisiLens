@@ -42,9 +42,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sampan/VisiLens"
-Repository = "https://github.com/sampan/VisiLens"
-Issues = "https://github.com/sampan/VisiLens/issues"
+Homepage = "https://github.com/PStarH/VisiLens"
+Repository = "https://github.com/PStarH/VisiLens"
+Issues = "https://github.com/PStarH/VisiLens/issues"
 
 [project.scripts]
 vdweb = "vdweb.cli:main"
