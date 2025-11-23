@@ -111,7 +111,7 @@ function ErrorDisplay({ message, onRetry }: ErrorDisplayProps) {
 
 // --- Main Component ---
 
-export function DataTable() {
+export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSocket> }) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   // WebSocket connection and data
@@ -126,7 +126,7 @@ export function DataTable() {
     sortColumn,
     sortState,
     reconnect,
-  } = useVisiLensSocket();
+  } = socket;
 
   // Virtualizer for row virtualization
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -199,6 +199,16 @@ export function DataTable() {
     return <ErrorDisplay message={error} onRetry={reconnect} />;
   }
 
+  // Show No Data state
+  if (!isLoading && total === 0 && status === 'connected') {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-canvas text-center">
+        <div className="text-secondary text-lg">No Data</div>
+        <div className="text-secondary/50 text-sm">The dataset is empty.</div>
+      </div>
+    );
+  }
+
   // --- Main Grid Render ---
 
   return (
@@ -214,6 +224,7 @@ export function DataTable() {
         {columns.map((col) => {
           const isSorted = sortState?.column === col.name;
           const isAscending = sortState?.ascending ?? true;
+          const isNumber = ['integer', 'float', 'currency'].includes(col.type);
 
           return (
             <button
@@ -223,17 +234,20 @@ export function DataTable() {
                 const ascending = isSorted ? !isAscending : true;
                 sortColumn(col.name, ascending);
               }}
-              className="flex items-center justify-between px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none hover:bg-row-hover/50 transition-colors cursor-pointer text-left"
+              className={clsx(
+                "flex items-center px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none hover:bg-row-hover/50 transition-colors cursor-pointer",
+                isNumber ? "justify-end text-right" : "justify-between text-left"
+              )}
               style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
             >
-              <div className="flex flex-col gap-0.5 truncate">
+              <div className={clsx("flex flex-col gap-0.5 truncate", isNumber && "items-end")}>
                 <span>{col.name}</span>
                 <span className="text-[10px] text-secondary/50 font-normal lowercase">
                   {col.type}
                 </span>
               </div>
               {isSorted && (
-                <div className="ml-2 shrink-0">
+                <div className={clsx("shrink-0", isNumber ? "mr-2 order-first" : "ml-2")}>
                   {isAscending ? (
                     <ArrowUp className="h-3 w-3 text-accent" />
                   ) : (
@@ -305,18 +319,24 @@ export function DataTable() {
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                {columns.map((col) => (
-                  <div
-                    key={col.name}
-                    className="flex items-center px-4 border-r border-border/30 last:border-r-0 text-[13px] text-primary/90 whitespace-nowrap overflow-hidden"
-                    style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
-                    title={String(row[col.name] ?? '')}
-                  >
-                    <span className="truncate w-full">
-                      {String(row[col.name] ?? '')}
-                    </span>
-                  </div>
-                ))}
+                {columns.map((col) => {
+                  const isNumber = ['integer', 'float', 'currency'].includes(col.type);
+                  return (
+                    <div
+                      key={col.name}
+                      className={clsx(
+                        "flex items-center px-4 border-r border-border/30 last:border-r-0 text-[13px] text-primary/90 whitespace-nowrap overflow-hidden",
+                        isNumber ? "justify-end text-right" : "justify-start text-left"
+                      )}
+                      style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+                      title={String(row[col.name] ?? '')}
+                    >
+                      <span className="truncate w-full">
+                        {String(row[col.name] ?? '')}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}

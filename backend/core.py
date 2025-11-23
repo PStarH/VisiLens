@@ -8,6 +8,7 @@ sorting) happen here - the browser is just a renderer.
 
 from __future__ import annotations
 
+import math
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -291,7 +292,14 @@ def _serialize_value(value: Any) -> Any:
         return None
 
     # Already serializable primitives
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, (str, int, bool)):
+        return value
+
+    if isinstance(value, float):
+        if math.isnan(value):
+            return "NaN"
+        if math.isinf(value):
+            return "Infinity" if value > 0 else "-Infinity"
         return value
 
     # Handle bytes
@@ -346,39 +354,4 @@ def load_dataset(path: str) -> DatasetHandle:
     vd_path = visidata.Path(str(filepath))
     sheet = vd.openSource(vd_path)
 
-    # VisiData's reload() is async by default. For synchronous loading,
-    # we directly call iterload() and materialize the rows.
-    if hasattr(sheet, 'iterload'):
-        sheet.rows = list(sheet.iterload())
-
-    # Handle CSV/TSV: first row is header, create columns from it
-    # VisiData's CsvSheet yields raw lists where row[0] is the header
-    if not sheet.columns and sheet.rows:
-        first_row = sheet.rows[0]
-        if isinstance(first_row, (list, tuple)):
-            # First row is the header - use it for column names
-            for i, col_name in enumerate(first_row):
-                sheet.addColumn(visidata.ColumnItem(str(col_name), i))
-            # Remove header row from data
-            sheet.rows = sheet.rows[1:]
-
-    return DatasetHandle(
-        sheet=sheet,
-        path=str(filepath.absolute())
-    )
-
-
-# Module-level dataset cache for the simple demo
-# In production, this would be replaced with proper session management
-_current_dataset: DatasetHandle | None = None
-
-
-def get_current_dataset() -> DatasetHandle | None:
-    """Get the currently loaded dataset (for demo purposes)."""
-    return _current_dataset
-
-
-def set_current_dataset(dataset: DatasetHandle) -> None:
-    """Set the current dataset (for demo purposes)."""
-    global _current_dataset
-    _current_dataset = dataset
+    # VisiData's reload() is async by default. For synt

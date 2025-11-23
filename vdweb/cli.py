@@ -12,6 +12,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
+import socket
 
 import click
 import uvicorn
@@ -20,6 +21,11 @@ from .server import create_app, set_initial_dataset_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
 
 
 @click.command()
@@ -50,6 +56,15 @@ def main(filename: str | None, host: str, port: int, no_browser: bool):
 
         set_initial_dataset_path(str(file_path))
         logger.info(f"Loading dataset: {file_path}")
+
+    # Check if port is in use and find a new one if necessary
+    start_port = port
+    while is_port_in_use(port):
+        logger.warning(f"Port {port} is in use, trying {port + 1}")
+        port += 1
+        if port - start_port > 100:
+            click.echo(f"Error: Could not find an open port starting from {start_port}", err=True)
+            sys.exit(1)
 
     # Create the FastAPI app
     app = create_app()

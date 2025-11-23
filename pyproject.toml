@@ -48,6 +48,7 @@ Issues = "https://github.com/sampan/VisiLens/issues"
 
 [project.scripts]
 vdweb = "vdweb.cli:main"
+visilens = "vdweb.cli:main"
 
 [tool.setuptools]
 packages = ["vdweb"]

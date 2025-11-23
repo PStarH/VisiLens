@@ -25,6 +25,11 @@ interface SortState {
   ascending: boolean;
 }
 
+interface FilterState {
+  column: string;
+  term: string;
+}
+
 const WS_URL = 'ws://localhost:8000/ws';
 
 export function useVisiLensSocket() {
@@ -35,6 +40,7 @@ export function useVisiLensSocket() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [sortState, setSortState] = useState<SortState | null>(null);
+  const [filterState, setFilterState] = useState<FilterState | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -115,11 +121,20 @@ export function useVisiLensSocket() {
               // Clear rows map - will be refilled with filtered data
               rowsMapRef.current.clear();
               setTotal(message.data.total);
+              if (message.data.state?.filter) {
+                setFilterState({
+                  column: message.data.state.filter.column,
+                  term: message.data.state.filter.term
+                });
+              } else {
+                setFilterState(null);
+              }
               break;
             }
             case 'reset': {
               // Clear sort state and rows map
               setSortState(null);
+              setFilterState(null);
               rowsMapRef.current.clear();
               setTotal(message.data.total);
               break;
@@ -194,6 +209,16 @@ export function useVisiLensSocket() {
     }
   }, []);
 
+  const filterColumn = useCallback((column: string, term: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        action: 'filter',
+        column,
+        term
+      }));
+    }
+  }, []);
+
   const reconnect = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.close();
@@ -211,6 +236,8 @@ export function useVisiLensSocket() {
     fetchRows,
     sortColumn,
     sortState,
+    filterColumn,
+    filterState,
     reconnect
   };
 }

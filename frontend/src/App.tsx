@@ -7,8 +7,12 @@
 
 import { DataTable } from './components/DataTable';
 import { Database, Zap } from 'lucide-react';
+import { useVisiLensSocket } from './hooks/useVisiLensSocket';
 
 function App() {
+  const socket = useVisiLensSocket();
+  const { total } = socket;
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-canvas text-primary font-sans">
       {/* App Header */}
@@ -32,13 +36,15 @@ function App() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden relative">
-        <DataTable />
+        <DataTable socket={socket} />
       </main>
 
       {/* Status Bar */}
       <footer className="flex h-6 items-center border-t border-border bg-sidebar/50 px-3 text-[11px] text-secondary shrink-0 select-none">
         <div className="flex items-center gap-3">
           <span>ws://localhost:8000</span>
+          <span className="text-border">|</span>
+          <span>Total Rows: {total.toLocaleString()}</span>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <span>UTF-8</span>

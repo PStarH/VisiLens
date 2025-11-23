@@ -291,7 +291,17 @@ def _serialize_value(value: Any) -> Any:
         return None
 
     # Already serializable primitives
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, (str, bool)):
+        return value
+
+    if isinstance(value, (int, float)):
+        # Handle NaN and Infinity which are not valid JSON
+        import math
+        if isinstance(value, float):
+            if math.isnan(value):
+                return "NaN"
+            if math.isinf(value):
+                return "Infinity" if value > 0 else "-Infinity"
         return value
 
     # Handle bytes
