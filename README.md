@@ -155,17 +155,46 @@ Want to contribute? Great! Here's how to set up the development environment.
     ```
 
 4.  **Run Locally**
-    
-    Terminal 1 (Backend):
-    ```bash
-    uvicorn backend.main:app --reload --port 8000
-    ```
 
-    Terminal 2 (Frontend):
-    ```bash
-    cd frontend
-    npm run dev
-    ```
+  Terminal 1 (Backend):
+  ```bash
+  uvicorn backend.main:app --reload --port 8000
+  ```
+
+  Terminal 2 (Frontend):
+  ```bash
+  cd frontend
+  npm run dev
+  ```
+
+5.  **Build frontend assets (optional)**
+
+  If you prefer to run only the Python CLI (without a separate Vite dev server), you can build the frontend once:
+
+  ```bash
+  cd frontend
+  npm run build
+  ```
+
+  This produces a production bundle under `frontend/dist/` which is copied into `vdweb/static/` for releases. End users then just run:
+
+  ```bash
+  vdweb path/to/data.csv
+  ```
+
+## 🤝 Contributing
+
+### For Contributors: where things live
+
+- **Python package (`vdweb/`):** This is the installable package published to PyPI. The CLI entrypoints `vdweb` / `visilens` both resolve to `vdweb.cli:main` as configured in `pyproject.toml`.
+- **Dev backend (`backend/`):** A separate FastAPI app used only for local development (`uvicorn backend.main:app`). It mirrors the behavior of the packaged backend but is not what users import when they install `vdweb`.
+- **Core logic:** The VisiData-powered data access layer lives in `vdweb/core.py` (and is mirrored in `backend/core.py` for the dev app). If you want to change how data is loaded/sorted/filtered, start here.
+
+### Typical contributor workflow
+
+1. Edit backend / core logic in `vdweb/` (and update `backend/` if needed for dev parity).
+2. Run the dev backend + frontend locally as described in [Development](#-development).
+3. If you change the React app and want those changes to ship, run `npm run build` in `frontend/` so the bundle that will be copied into `vdweb/static/` is up to date.
 
 ## 📄 License
 
