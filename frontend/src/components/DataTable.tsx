@@ -5,9 +5,9 @@
  * Communicates with the backend via WebSocket for real-time data.
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, WifiOff, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
+import { AlertCircle, WifiOff, RefreshCw, ArrowUp, ArrowDown, Filter, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useVisiLensSocket, type ConnectionStatus } from '../hooks/useVisiLensSocket';
 
@@ -125,8 +125,22 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
     fetchRows,
     sortColumn,
     sortState,
+    filterColumn,
+    filterState,
     reconnect,
   } = socket;
+
+  // Local state for filter input
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  const [filterValue, setFilterValue] = useState('');
+  const filterInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when opening filter
+  useEffect(() => {
+    if (activeFilterColumn && filterInputRef.current) {
+      filterInputRef.current.focus();
+    }
+  }, [activeFilterColumn]);
 
   // Virtualizer for row virtualization
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -224,38 +238,119 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
         {columns.map((col) => {
           const isSorted = sortState?.column === col.name;
           const isAscending = sortState?.ascending ?? true;
+          const isFiltered = filterState?.column === col.name;
+          const isFiltering = activeFilterColumn === col.name;
           const isNumber = ['integer', 'float', 'currency'].includes(col.type);
 
           return (
-            <button
+            <div
               key={col.name}
-              onClick={() => {
-                // Toggle sort direction if clicking the same column
-                const ascending = isSorted ? !isAscending : true;
-                sortColumn(col.name, ascending);
-              }}
               className={clsx(
-                "flex items-center px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none hover:bg-row-hover/50 transition-colors cursor-pointer",
-                isNumber ? "justify-end text-right" : "justify-between text-left"
+                "group flex items-center px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none transition-colors",
+                isNumber ? "justify-end text-right" : "justify-between text-left",
+                isFiltering ? "bg-surface" : "hover:bg-row-hover/50"
               )}
               style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
             >
-              <div className={clsx("flex flex-col gap-0.5 truncate", isNumber && "items-end")}>
-                <span>{col.name}</span>
-                <span className="text-[10px] text-secondary/50 font-normal lowercase">
-                  {col.type}
-                </span>
-              </div>
-              {isSorted && (
-                <div className={clsx("shrink-0", isNumber ? "mr-2 order-first" : "ml-2")}>
-                  {isAscending ? (
-                    <ArrowUp className="h-3 w-3 text-accent" />
-                  ) : (
-                    <ArrowDown className="h-3 w-3 text-accent" />
-                  )}
+              {isFiltering ? (
+                <div className="flex w-full items-center gap-2">
+                  <input
+                    ref={filterInputRef}
+                    type="text"
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        filterColumn(col.name, filterValue);
+                        setActiveFilterColumn(null);
+                      } else if (e.key === 'Escape') {
+                        setActiveFilterColumn(null);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Close on blur if empty, otherwise keep open?
+                      // For now, just close to be safe
+                      setActiveFilterColumn(null);
+                    }}
+                    className="h-6 w-full rounded border border-accent/50 bg-canvas px-2 text-xs text-primary focus:border-accent focus:outline-none"
+                    placeholder="Filter..."
+                  />
+                  <button
+                    onMouseDown={(e) => e.preventDefault()} // Prevent blur
+                    onClick={() => setActiveFilterColumn(null)}
+                    className="text-secondary hover:text-primary"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <div
+                    className={clsx(
+                      "flex flex-col gap-0.5 truncate cursor-pointer flex-1",
+                      isNumber && "items-end"
+                    )}
+                    onClick={() => {
+                      const ascending = isSorted ? !isAscending : true;
+                      sortColumn(col.name, ascending);
+                    }}
+                  >
+                    <span>{col.name}</span>
+                    <span className="text-[10px] text-secondary/50 font-normal lowercase">
+                      {col.type}
+                    </span>
+                  </div>
+
+                  <div className={clsx("flex items-center gap-1", isNumber && "order-first mr-2")}>
+                    {isSorted && !isNumber && (
+                      <div className="shrink-0 ml-2">
+                        {isAscending ? (
+                          <ArrowUp className="h-3 w-3 text-accent" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3 text-accent" />
+                        )}
+                      </div>
+                    )}
+                    
+                    {isSorted && isNumber && (
+                      <div className="shrink-0 mr-2">
+                        {isAscending ? (
+                          <ArrowUp className="h-3 w-3 text-accent" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3 text-accent" />
+                        )}
+                      </div>
+                    )}
+
+                    {isFiltered ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          filterColumn(col.name, ''); // Clear filter
+                        }}
+                        className="flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent/20"
+                        title={`Filtered by: ${filterState?.term}`}
+                      >
+                        <Filter className="h-3 w-3" />
+                        <span>FILTER</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveFilterColumn(col.name);
+                          setFilterValue('');
+                        }}
+                        className="flex items-center gap-1 rounded border border-border/40 bg-sidebar/60 px-2 py-1 text-[10px] font-semibold text-secondary hover:border-accent hover:text-accent"
+                      >
+                        <Filter className="h-3 w-3" />
+                        <span>FILTER</span>
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
