@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect x="64" y="64" width="384" height="384" rx="64" fill="url(#grad1)" filter="url(#shadow)" />
+  
+  <!-- Grid Lines -->
+  <g stroke="rgba(255,255,255,0.3)" stroke-width="16">
+    <line x1="64" y1="192" x2="448" y2="192" />
+    <line x1="64" y1="320" x2="448" y2="320" />
+    <line x1="192" y1="64" x2="192" y2="448" />
+    <line x1="320" y1="64" x2="320" y2="448" />
+  </g>
+  
+  <!-- Magnifying Glass (Lens) -->
+  <g transform="translate(256, 256)">
+    <circle cx="0" cy="0" r="96" fill="rgba(255,255,255,0.1)" stroke="white" stroke-width="24" />
+    <line x1="68" y1="68" x2="120" y2="120" stroke="white" stroke-width="24" stroke-linecap="round" />
+    
+    <!-- Highlight inside lens -->
+    <path d="M -60 -60 Q -30 -90 0 -90" stroke="rgba(255,255,255,0.6)" stroke-width="8" fill="none" stroke-linecap="round" />
+  </g>
+</svg>
