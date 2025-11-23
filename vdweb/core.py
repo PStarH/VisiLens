@@ -134,11 +134,19 @@ class DatasetHandle:
                     val = col.getTypedValue(row)
                     # Handle None values (sort them to the end)
                     if val is None:
-                        return (1, None) if ascending else (0, None)
-                    return (0, val)
+                        return (2, None) if ascending else (0, None)
+                    
+                    # Check if value matches column type (e.g. float)
+                    # If column type is float but val is string (conversion failed),
+                    # we treat it as a different group to avoid comparison errors.
+                    if isinstance(val, (int, float)):
+                        return (0, val)
+                    else:
+                        # Failed conversion or other type
+                        return (1, str(val))
                 except Exception:
                     # Fallback to display value for comparison
-                    return (0, col.getDisplayValue(row))
+                    return (1, col.getDisplayValue(row))
 
             self.sheet.rows = sorted(
                 self.sheet.rows,
@@ -372,10 +380,79 @@ def load_dataset(path: str) -> DatasetHandle:
             # Remove header row from data
             sheet.rows = sheet.rows[1:]
 
+    # Infer column types to ensure correct sorting (e.g. numeric vs string)
+    _infer_column_types(sheet)
+
     return DatasetHandle(
         sheet=sheet,
         path=str(filepath.absolute())
     )
+
+
+def _infer_column_types(sheet: Any, sample_size: int = 100) -> None:
+    """
+    Infer column types by sampling data.
+    
+    Strictly applies Type Inference so that numeric columns are recognized 
+    as float or int, enabling correct numerical sorting.
+    """
+    for col in sheet.columns:
+        # Skip if type is already set to something specific (not anytype)
+        type_name = getattr(col.type, '__name__', str(col.type))
+        if type_name not in ('anytype', 'str', 'string', ''):
+             continue
+
+        # Get sample values (skip empty/None)
+        values = []
+        for row in sheet.rows[:sample_size]:
+            try:
+                val = col.getValue(row)
+                if val is not None and val != '':
+                    values.append(val)
+            except Exception:
+                pass
+        
+        if not values:
+            continue
+            
+        # Helper to check type consistency
+        def check_type(type_func, threshold=0.8):
+            valid_count = 0
+            for v in values:
+                try:
+                    type_func(v)
+                    valid_count += 1
+                except ValueError:
+                    pass
+            return valid_count / len(values) >= threshold
+
+        # Try int first
+        if check_type(int):
+            col.type = int
+            _convert_column_data(col, sheet.rows)
+            continue
+
+        # Try float
+        if check_type(float):
+            col.type = float
+            _convert_column_data(col, sheet.rows)
+            continue
+
+
+def _convert_column_data(col: Any, rows: list[Any]) -> None:
+    """
+    Convert column data to the column's type.
+    This ensures that the underlying data matches the metadata type.
+    """
+    for row in rows:
+        try:
+            # getTypedValue uses the column's type to convert the raw value
+            val = col.getTypedValue(row)
+            # setValue updates the underlying storage (e.g. the list representing the row)
+            col.setValue(row, val)
+        except Exception:
+            # Leave original value on error
+            pass
 
 
 # Module-level dataset cache for the simple demo
