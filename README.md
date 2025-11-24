@@ -116,6 +116,8 @@ VisiLens is built on a robust modern stack designed for performance:
 
 We are actively working on making VisiLens the ultimate local data companion.
 
+For a detailed breakdown of our feature strategy and technical implementation plan, please see [ROADMAP.md](DOCUMENTATION/ROADMAP.md).
+
 - [x] **v0.1:** Core Engine, Virtual Scrolling, Sorting, Filtering.
 - [ ] **Jupyter Integration:** Launch VisiLens directly from a notebook cell (`visilens.view(df)`).
 - [ ] **Drag-and-drop file loading**
