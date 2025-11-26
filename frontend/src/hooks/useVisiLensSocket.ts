@@ -32,6 +32,25 @@ interface FilterState {
 
 const WS_URL = 'ws://localhost:8000/ws';
 
+interface AnalysisItem {
+  name: string;
+  count: number;
+  percent: number;
+}
+
+interface ColumnStats {
+  null_count: number;
+  null_percent: number;
+  unique_count: number;
+  is_sample: boolean;
+  scanned_rows: number;
+  total_rows: number;
+  min?: number;
+  max?: number;
+  mean?: number;
+  type: 'numeric' | 'string';
+}
+
 export function useVisiLensSocket() {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +60,15 @@ export function useVisiLensSocket() {
   const [isLoading, setIsLoading] = useState(true);
   const [sortState, setSortState] = useState<SortState | null>(null);
   const [filterState, setFilterState] = useState<FilterState | null>(null);
+  const [analysisData, setAnalysisData] = useState<{ column: string; data: AnalysisItem[] } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Use refs for stats to avoid re-rendering the entire table when one column updates
+  // Use Map for LRU cache (preserves insertion order)
+  const statsCacheRef = useRef<Map<string, ColumnStats>>(new Map());
+  const statsListenersRef = useRef<Map<string, Set<(stats: ColumnStats) => void>>>(new Map());
+  const MAX_CACHE_SIZE = 100;
+  const MAX_ROWS_CACHED = 2000; // Window size for row cache
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -50,7 +78,7 @@ export function useVisiLensSocket() {
   const rowsMapRef = useRef<Map<number, Row>>(new Map());
 
   // Use a ref to hold the connect function to avoid circular dependency in useCallback
-  const connectRef = useRef<() => void>(() => {});
+  const connectRef = useRef<() => void>(() => { });
 
   const connect = useCallback(() => {
     try {
@@ -75,6 +103,10 @@ export function useVisiLensSocket() {
           if (!message.success) {
             console.error('WebSocket Error:', message.error);
             setError(message.error || 'Unknown error');
+            // If analysis failed, stop the spinner
+            if (message.action === 'analysis_result') {
+              setIsAnalyzing(false);
+            }
             return;
           }
 
@@ -83,21 +115,42 @@ export function useVisiLensSocket() {
               setColumns(message.data.columns);
               break;
             case 'rows': {
-              const { rows: newRows, start, total: totalRows, reset } = message.data;
-              
+              const { header, rows: newRowsData, start, total: totalRows, reset } = message.data;
+
               if (reset) {
                 rowsMapRef.current.clear();
               }
 
               setTotal(totalRows);
-              
-              // Update rows map
-              newRows.forEach((row: Row, index: number) => {
-                rowsMapRef.current.set(start + index, row);
+
+              // Convert array-of-arrays to objects using header
+              // This is done lazily here, but could be deferred to render time for more memory savings
+              // For now, we keep the Row interface compatible
+              newRowsData.forEach((rowValues: unknown[], index: number) => {
+                const rowObj: Row = {};
+                header.forEach((colName: string, colIdx: number) => {
+                  rowObj[colName] = rowValues[colIdx];
+                });
+                rowsMapRef.current.set(start + index, rowObj);
               });
 
+              // Eviction Policy: Keep cache size within limits
+              // We remove rows that are furthest from the current viewport (approximated by 'start')
+              // Simple strategy: If size > MAX, delete keys outside [start - 1000, start + 1000]
+              if (rowsMapRef.current.size > MAX_ROWS_CACHED) {
+                const keysToDelete: number[] = [];
+                const keepStart = Math.max(0, start - MAX_ROWS_CACHED / 2);
+                const keepEnd = start + MAX_ROWS_CACHED / 2;
+
+                for (const key of rowsMapRef.current.keys()) {
+                  if (key < keepStart || key > keepEnd) {
+                    keysToDelete.push(key);
+                  }
+                }
+                keysToDelete.forEach(k => rowsMapRef.current.delete(k));
+              }
+
               // Update state with a new Map to trigger re-render
-              // This is much more efficient than creating a sparse array of size 'total'
               setRows(new Map(rowsMapRef.current));
               break;
             }
@@ -109,6 +162,7 @@ export function useVisiLensSocket() {
                   ascending: message.data.state.sort.ascending
                 });
               }
+              statsCacheRef.current.clear(); // Clear stats cache on sort
               break;
             }
             case 'filtered': {
@@ -124,6 +178,7 @@ export function useVisiLensSocket() {
               } else {
                 setFilterState(null);
               }
+              statsCacheRef.current.clear(); // Clear stats cache on filter
               break;
             }
             case 'reset': {
@@ -133,6 +188,35 @@ export function useVisiLensSocket() {
               rowsMapRef.current.clear();
               setRows(new Map());
               setTotal(message.data.total);
+              statsCacheRef.current.clear(); // Clear stats cache on reset
+              break;
+            }
+            case 'analysis_result': {
+              setAnalysisData({
+                column: message.data.column,
+                data: message.data.data
+              });
+              setIsAnalyzing(false);
+              break;
+            }
+            case 'stats_result': {
+              const { column, data } = message.data;
+
+              // LRU Logic
+              const cache = statsCacheRef.current;
+              if (cache.has(column)) {
+                cache.delete(column); // Re-insert to update order (mark as recently used)
+              } else if (cache.size >= MAX_CACHE_SIZE) {
+                const oldestKey = cache.keys().next().value;
+                if (oldestKey) cache.delete(oldestKey);
+              }
+              cache.set(column, data);
+
+              // Notify listeners
+              const listeners = statsListenersRef.current.get(column);
+              if (listeners) {
+                listeners.forEach(cb => cb(data));
+              }
               break;
             }
             case 'info':
@@ -205,14 +289,81 @@ export function useVisiLensSocket() {
     }
   }, []);
 
-  const filterColumn = useCallback((column: string, term: string) => {
+  const applyFilter = useCallback((payload: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
-        action: 'filter',
-        column,
-        term
+        action: 'apply_filter',
+        filter_payload: payload
       }));
     }
+  }, []);
+
+  const analyzeColumn = useCallback((column: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      setIsAnalyzing(true);
+      setAnalysisData(null); // Clear previous data
+      wsRef.current.send(JSON.stringify({
+        action: 'analyze',
+        column
+      }));
+    }
+  }, []);
+
+  const getColumnStats = useCallback((column: string) => {
+    // Check cache first (handled by component, but good to have here too if we want to prevent redundant calls)
+    // However, since we don't have access to the latest statsCache in this callback without adding it to dependency array
+    // (which would cause re-creation of callback), we rely on the component to check cache.
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      const reqId = Math.floor(Math.random() * 1000000);
+      console.log(`[useVisiLensSocket] Sending get_stats for: ${column} (req_id: ${reqId})`);
+      wsRef.current.send(JSON.stringify({
+        action: 'get_stats',
+        column,
+        req_id: reqId,
+        force: false // Use backend cache if available
+      }));
+    }
+  }, []);
+
+  const renameColumn = useCallback((oldName: string, newName: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        action: 'rename_col',
+        col_id: oldName,
+        new_name: newName
+      }));
+    }
+  }, []);
+
+  const setColumnType = useCallback((column: string, type: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        action: 'set_col_type',
+        col_id: column,
+        type: type
+      }));
+    }
+  }, []);
+
+  const subscribeToStats = useCallback((column: string, callback: (stats: ColumnStats) => void) => {
+    if (!statsListenersRef.current.has(column)) {
+      statsListenersRef.current.set(column, new Set());
+    }
+    statsListenersRef.current.get(column)!.add(callback);
+    return () => {
+      const listeners = statsListenersRef.current.get(column);
+      if (listeners) {
+        listeners.delete(callback);
+        if (listeners.size === 0) {
+          statsListenersRef.current.delete(column);
+        }
+      }
+    };
+  }, []);
+
+  const getCachedStats = useCallback((column: string) => {
+    return statsCacheRef.current.get(column);
   }, []);
 
   const reconnect = useCallback(() => {
@@ -232,8 +383,16 @@ export function useVisiLensSocket() {
     fetchRows,
     sortColumn,
     sortState,
-    filterColumn,
+    applyFilter,
     filterState,
-    reconnect
+    reconnect,
+    analyzeColumn,
+    analysisData,
+    isAnalyzing,
+    getColumnStats,
+    subscribeToStats,
+    getCachedStats,
+    renameColumn,
+    setColumnType,
   };
 }

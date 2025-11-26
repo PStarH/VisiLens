@@ -8,6 +8,8 @@ sorting) happen here - the browser is just a renderer.
 
 from __future__ import annotations
 
+import collections
+import math
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -70,9 +72,9 @@ class DatasetHandle:
                 ))
             return columns
 
-    def get_rows(self, start: int = 0, limit: int = 50) -> list[dict[str, Any]]:
+    def get_rows(self, start: int = 0, limit: int = 50) -> dict[str, Any]:
         """
-        Return a slice of rows as list of dicts.
+        Return a slice of rows with header and data.
 
         All values are converted to JSON-serializable types.
         Non-serializable values become strings.
@@ -82,46 +84,50 @@ class DatasetHandle:
             limit: Maximum number of rows to return
 
         Returns:
-            List of row dictionaries with column names as keys
+            Dictionary with "header" (list of column names) and "rows" (list of lists)
         """
         with self._lock:
             rows = self.sheet.rows[start:start + limit]
             columns = self.sheet.columns
 
-            result = []
+            # Get column names for header
+            header = [col.name for col in columns]
+            result_rows = []
             
             # Optimization: Pre-calculate column indices for fast access
             # Only for columns that are ItemColumn (have 'expr' as int index)
             col_indices = []
             for col in columns:
                 if hasattr(col, 'expr') and isinstance(col.expr, int):
-                    col_indices.append((col.name, col.expr, True))
+                    col_indices.append((col.expr, True, col))
                 else:
-                    col_indices.append((col.name, col, False))
+                    col_indices.append((col, False, col))
 
             for row in rows:
-                row_dict = {}
+                row_list = []
                 # Fast path check: if row is a list, we can use direct index access
                 is_list_row = isinstance(row, list)
                 
-                for name, col_or_idx, is_index in col_indices:
+                for col_or_idx, is_index, col in col_indices:
                     try:
                         if is_list_row and is_index:
                             # Fast path: direct list access
                             # We assume data is already converted by _convert_column_data
                             val = row[col_or_idx]
-                            row_dict[name] = _serialize_value(val)
+                            row_list.append(_serialize_value(val))
                         else:
                             # Slow path: use VisiData getter
-                            col = col_or_idx
                             value = col.getTypedValue(row)
-                            row_dict[name] = _serialize_value(value)
+                            row_list.append(_serialize_value(value))
                     except Exception:
                         # Fallback to display value on any error
-                        col = col_or_idx if not is_index else next(c for c in columns if c.name == name)
-                        row_dict[name] = col.getDisplayValue(row)
-                result.append(row_dict)
-            return result
+                        row_list.append(col.getDisplayValue(row))
+                result_rows.append(row_list)
+            
+            return {
+                "header": header,
+                "rows": result_rows
+            }
 
     def sort_by_column(self, column_name: str, ascending: bool = True) -> None:
         """
@@ -250,6 +256,163 @@ class DatasetHandle:
             self.sheet.rows = filtered
             self._current_filter = (column_name, search_term)
 
+    def apply_structured_filter(self, filter_payload: dict[str, Any] | None) -> None:
+        """
+        Apply a filter to the dataset. Supports both structured (basic) and expression (advanced) filters.
+
+        Args:
+            filter_payload: Dict with:
+                - type: 'basic' | 'expression'
+                - Basic: 'column', 'operator', 'value'
+                - Expression: 'expression' (Python code)
+        """
+        with self._lock:
+            # Reset if payload is None or "reset"
+            if not filter_payload or filter_payload == "reset":
+                self.clear_filter()
+                return
+
+            # Store original rows if this is the first operation
+            if self._original_rows is None:
+                self._original_rows = self.sheet.rows[:]
+
+            # Reset to original rows before applying new filter
+            self.sheet.rows = self._original_rows[:]
+            
+            # Clear any existing selection
+            if hasattr(self.sheet, 'selected'):
+                self.sheet.selected = []
+
+            filter_type = filter_payload.get("type", "basic")
+
+            # --- Advanced Mode: Expression Filter ---
+            if filter_type == "expression":
+                expression = filter_payload.get("expression")
+                if not expression:
+                    return
+
+                try:
+                    # Use ExprColumn to evaluate the expression safely
+                    expr_col = visidata.ExprColumn("temp_filter", expression)
+                    expr_col.sheet = self.sheet
+                    
+                    filtered_rows = []
+                    for row in self.sheet.rows:
+                        # getValue evaluates the expression for the given row
+                        if expr_col.getValue(row):
+                            filtered_rows.append(row)
+                    
+                    self.sheet.rows = filtered_rows
+                    self._current_filter = ("Expression", expression)
+                    return
+                except Exception as e:
+                    # Revert to original rows on error
+                    self.sheet.rows = self._original_rows[:]
+                    raise ValueError(f"Invalid expression: {e}")
+
+            # --- Basic Mode: Structured Filter ---
+            conditions = filter_payload.get("conditions")
+            if not conditions:
+                # Fallback for backward compatibility or single filter
+                column_name = filter_payload.get("column")
+                operator = filter_payload.get("operator")
+                value = filter_payload.get("value")
+                if column_name and operator:
+                    conditions = [{"column": column_name, "operator": operator, "value": value}]
+                else:
+                    return
+
+            # Apply all conditions (AND logic)
+            # We start with the full dataset (restored above) and filter down
+            current_rows = self.sheet.rows
+            
+            import re
+
+            for condition in conditions:
+                column_name = condition.get("column")
+                operator = condition.get("operator")
+                value = condition.get("value")
+
+                if not column_name or not operator:
+                    continue
+
+                col = next((c for c in self.sheet.columns if c.name == column_name), None)
+                if col is None:
+                    continue # Skip invalid columns
+
+                # Determine target type for casting
+                col_type_name = _get_type_name(col.type)
+                is_numeric = col_type_name in ('float', 'integer', 'currency')
+
+                # Helper to cast value safely
+                def safe_cast(val, to_type):
+                    try:
+                        if to_type == 'float':
+                            return float(val)
+                        elif to_type == 'int':
+                            return int(val)
+                        elif to_type == 'str':
+                            return str(val)
+                        return val
+                    except (ValueError, TypeError):
+                        return val
+
+                # Cast the filter value
+                target_val = safe_cast(value, 'float' if is_numeric else 'str')
+                
+                # Debug logging
+                print(f"[Filter] Applying {operator} on {column_name} with value '{target_val}' (Type: {type(target_val)})")
+
+                rows_to_keep = []
+                
+                for row in current_rows:
+                    try:
+                        cell_val = col.getTypedValue(row)
+                        
+                        # Handle None/Empty
+                        if cell_val is None:
+                            if operator == 'is_empty':
+                                rows_to_keep.append(row)
+                            continue
+
+                        # Comparison Logic
+                        match = False
+                        if operator == 'eq':
+                            # Strict equality
+                            match = str(cell_val) == str(target_val) if not is_numeric else cell_val == target_val
+                        elif operator == 'neq':
+                            match = str(cell_val) != str(target_val) if not is_numeric else cell_val != target_val
+                        elif operator == 'contains':
+                            match = str(target_val).lower() in str(cell_val).lower()
+                        elif operator == 'gt':
+                            if is_numeric and isinstance(cell_val, (int, float)):
+                                match = cell_val > target_val
+                        elif operator == 'lt':
+                            if is_numeric and isinstance(cell_val, (int, float)):
+                                match = cell_val < target_val
+                        elif operator == 'regex':
+                            match = bool(re.search(str(target_val), str(cell_val), re.IGNORECASE))
+                        elif operator == 'is_empty':
+                            match = cell_val == ""
+                        
+                        if match:
+                            rows_to_keep.append(row)
+                    except Exception:
+                        continue
+                
+                # Update current rows for the next condition
+                current_rows = rows_to_keep
+
+            # Final result
+            self.sheet.rows = current_rows
+            
+            # Update filter state description
+            if len(conditions) == 1:
+                c = conditions[0]
+                self._current_filter = (c["column"], f"{c['operator']} {c['value']}")
+            else:
+                self._current_filter = ("Multiple", f"{len(conditions)} conditions")
+
     def clear_filter(self) -> None:
         """
         Clear all filters and restore original rows.
@@ -311,6 +474,220 @@ class DatasetHandle:
                     "term": self._current_filter[1] if self._current_filter else None,
                 } if self._current_filter else None,
             }
+
+    def get_column_frequency(self, col_name: str, limit: int = 20) -> list[dict[str, Any]]:
+        """
+        Calculate frequency distribution for a column.
+        Returns top `limit` most frequent values.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting frequency analysis for column: {col_name}")
+
+        with self._lock:
+            col = next((c for c in self.sheet.columns if c.name == col_name), None)
+            if col is None:
+                raise ValueError(f"Column '{col_name}' not found")
+
+            # Use Counter to count values
+            counter = collections.Counter()
+            
+            # Optimization: Fast path for list-based rows
+            if hasattr(col, 'expr') and isinstance(col.expr, int) and self.sheet.rows and isinstance(self.sheet.rows[0], list):
+                logger.info("Using fast path for frequency analysis")
+                idx = col.expr
+                for row in self.sheet.rows:
+                    try:
+                        val = row[idx]
+                        # Handle None/NaN
+                        if val is None:
+                            val = "(empty)"
+                        elif isinstance(val, float) and math.isnan(val):
+                            val = "(empty)"
+                        
+                        # Ensure value is hashable
+                        if not isinstance(val, (str, int, float, bool, bytes)):
+                            val = str(val)
+                            
+                        counter[val] += 1
+                    except (IndexError, TypeError):
+                        pass
+            else:
+                logger.info("Using slow path for frequency analysis")
+                # Slow path
+                for row in self.sheet.rows:
+                    try:
+                        val = col.getValue(row)
+                        if val is None:
+                            val = "(empty)"
+                        elif isinstance(val, float) and math.isnan(val):
+                            val = "(empty)"
+                            
+                        # Ensure value is hashable
+                        if not isinstance(val, (str, int, float, bool, bytes)):
+                            val = str(val)
+                            
+                        counter[val] += 1
+                    except Exception:
+                        pass
+
+            total_count = sum(counter.values())
+            logger.info(f"Analysis complete. Total count: {total_count}")
+            
+            if total_count == 0:
+                return []
+
+            # Get top N
+            most_common = counter.most_common(limit)
+            
+            result = []
+            for val, count in most_common:
+                percent = (count / total_count) * 100
+                result.append({
+                    "name": str(val), # Ensure name is string for UI
+                    "count": count,
+                    "percent": round(percent, 2)
+                })
+                
+            return result
+
+    def get_column_stats_sample(self, col_name: str, sample_size: int = 10000) -> dict[str, Any]:
+        """
+        Calculate quick statistics for a column using sampling.
+        Optimized for performance (<50ms).
+        """
+        with self._lock:
+            col = next((c for c in self.sheet.columns if c.name == col_name), None)
+            if col is None:
+                raise ValueError(f"Column '{col_name}' not found")
+
+            # Determine rows to scan
+            total_rows = len(self.sheet.rows)
+            rows_to_scan = self.sheet.rows[:sample_size] if total_rows > sample_size else self.sheet.rows
+            scanned_count = len(rows_to_scan)
+            is_sample = total_rows > sample_size
+            
+            null_count = 0
+            values = []
+            numeric_values = []
+            
+            # Optimization: Fast path for list-based rows
+            if hasattr(col, 'expr') and isinstance(col.expr, int) and self.sheet.rows and isinstance(self.sheet.rows[0], list):
+                idx = col.expr
+                for row in rows_to_scan:
+                    try:
+                        val = row[idx]
+                        if val is None or val == "":
+                            null_count += 1
+                        else:
+                            values.append(val)
+                            if isinstance(val, (int, float)) and not (isinstance(val, float) and math.isnan(val)):
+                                numeric_values.append(val)
+                    except IndexError:
+                        null_count += 1
+            else:
+                # Slow path
+                for row in rows_to_scan:
+                    try:
+                        val = col.getValue(row)
+                        if val is None or val == "":
+                            null_count += 1
+                        else:
+                            values.append(val)
+                            if isinstance(val, (int, float)) and not (isinstance(val, float) and math.isnan(val)):
+                                numeric_values.append(val)
+                    except Exception:
+                        null_count += 1
+
+            # Calculate stats
+            unique_count = len(set(str(v) for v in values))
+            null_percent = round((null_count / scanned_count) * 100, 1) if scanned_count > 0 else 0
+            
+            stats = {
+                "column": col_name,
+                "scanned_rows": scanned_count,
+                "total_rows": total_rows,
+                "is_sample": is_sample,
+                "null_count": null_count,
+                "null_percent": null_percent,
+                "unique_count": unique_count,
+                "type": "string"
+            }
+            
+            if numeric_values:
+                stats["min"] = min(numeric_values)
+                stats["max"] = max(numeric_values)
+                stats["mean"] = round(sum(numeric_values) / len(numeric_values), 2)
+                stats["type"] = "float" if any(isinstance(x, float) for x in numeric_values) else "integer"
+            
+            return stats
+
+    def rename_column(self, old_name: str, new_name: str) -> None:
+        """
+        Rename a column.
+
+        Args:
+            old_name: Current name of the column
+            new_name: New name for the column
+
+        Raises:
+            ValueError: If column not found or new name is empty
+        """
+        if not new_name:
+            raise ValueError("New name cannot be empty")
+
+        with self._lock:
+            col = next((c for c in self.sheet.columns if c.name == old_name), None)
+            if col is None:
+                raise ValueError(f"Column '{old_name}' not found")
+            
+            col.name = new_name
+
+    def set_column_type(self, col_name: str, new_type: str) -> None:
+        """
+        Change the type of a column.
+
+        Args:
+            col_name: Name of the column
+            new_type: One of 'int', 'float', 'string', 'date'
+
+        Raises:
+            ValueError: If column not found or type not supported
+        """
+        with self._lock:
+            col = next((c for c in self.sheet.columns if c.name == col_name), None)
+            if col is None:
+                raise ValueError(f"Column '{col_name}' not found")
+
+            # Map string type to VisiData type
+            type_map = {
+                "int": int,
+                "float": float,
+                "string": str,
+                "str": str,
+                "date": visidata.date,
+            }
+            
+            if new_type not in type_map:
+                raise ValueError(f"Unsupported type: {new_type}")
+            
+            target_type = type_map[new_type]
+            
+            # Set the new type
+            col.type = target_type
+            
+            # Trigger re-parse/reload to ensure values are converted
+            # For CSVs (list-based rows), we need to reload to re-run type inference/conversion
+            # or manually convert the values in the rows.
+            # Reloading is safer to ensure consistency with VisiData's internal state.
+            if hasattr(self.sheet, 'reload'):
+                self.sheet.reload()
+                if hasattr(self.sheet, 'iterload'):
+                    self.sheet.rows = list(self.sheet.iterload())
+            
+            # Update original rows cache if it exists
+            if self._original_rows is not None:
+                self._original_rows = self.sheet.rows[:]
 
 
 def _get_type_name(vd_type: Any) -> str:

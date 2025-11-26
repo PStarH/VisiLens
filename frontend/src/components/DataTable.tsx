@@ -7,15 +7,19 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, WifiOff, RefreshCw, ArrowUp, ArrowDown, Filter, X } from 'lucide-react';
+import { AlertCircle, WifiOff, RefreshCw, ArrowUp, ArrowDown, BarChart2 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVisiLensSocket, type ConnectionStatus } from '../hooks/useVisiLensSocket';
+import { HeaderStats } from './HeaderStats';
+import { SelectionBar } from './SelectionBar';
+import { ContextMenu } from './ContextMenu';
 
 // --- Constants ---
 
 const ROW_HEIGHT = 30;
 const HEADER_HEIGHT = 48;
 const COLUMN_WIDTH = 150;
+const CHECKBOX_WIDTH = 48;
 const OVERSCAN = 20;
 
 // --- Sub-components ---
@@ -125,22 +129,215 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
     fetchRows,
     sortColumn,
     sortState,
-    filterColumn,
-    filterState,
     reconnect,
+    analyzeColumn,
+    getColumnStats,
+    subscribeToStats,
+    getCachedStats,
+    renameColumn,
+    setColumnType,
   } = socket;
 
-  // Local state for filter input
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
-  const [filterValue, setFilterValue] = useState('');
-  const filterInputRef = useRef<HTMLInputElement>(null);
+  // Selection state
+  const [selectedRowIndices, setSelectedRowIndices] = useState<Set<number>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-  // Focus input when opening filter
+  // Column Management State
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; colName: string; type: string } | null>(null);
+
+  // Long press handler refs
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isLongPressRef = useRef(false);
+  
+  // Drag state for overlay and logic
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+  const [dragCurrentIndex, setDragCurrentIndex] = useState<number | null>(null);
+  const [hasDragged, setHasDragged] = useState(false); // Track if user actually moved mouse
+
+  // Reset selection when total changes (e.g. filter applied)
   useEffect(() => {
-    if (activeFilterColumn && filterInputRef.current) {
-      filterInputRef.current.focus();
+    setSelectedRowIndices(new Set());
+    setIsSelectionMode(false);
+  }, [total]);
+
+  const toggleRow = useCallback((index: number) => {
+    setSelectedRowIndices(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      
+      // If deselecting the last item, exit selection mode?
+      // User might want to keep selection mode open even if empty, 
+      // but usually if they clear all, they might want to exit.
+      // Let's keep it simple: manual exit via 'X' in SelectionBar.
+      
+      return newSet;
+    });
+  }, []);
+
+  const handleRowMouseDown = useCallback((index: number, e: React.MouseEvent | React.TouchEvent) => {
+    // Prevent native text selection
+    if (e.type === 'mousedown') {
+      // Only handle left-click (button 0), ignore right-click (button 2)
+      const mouseEvent = e as React.MouseEvent;
+      if (mouseEvent.button !== 0) {
+        return; // Ignore non-left clicks
+      }
+      e.preventDefault();
     }
-  }, [activeFilterColumn]);
+
+    // If already in selection mode, handle drag start
+    if (isSelectionMode) {
+      setIsDragging(true);
+      // If holding Shift/Ctrl, we might want different logic, but for now just toggle/select
+      toggleRow(index); 
+      return;
+    }
+
+    // If NOT in selection mode:
+    // Check if it's a mouse event (Desktop)
+    // We can check e.type or use a heuristic. React.MouseEvent has 'button' property.
+    const isMouse = e.type === 'mousedown';
+    
+    if (isMouse) {
+      // Desktop: Start drag tracking but don't select yet
+      setIsDragging(true);
+      setDragStartIndex(index);
+      setDragCurrentIndex(index);
+      setHasDragged(false); // Reset drag flag
+      // Don't set selectedRowIndices yet - wait for actual drag movement
+    } else {
+      // Touch: Use existing Long Press logic
+      isLongPressRef.current = false;
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressRef.current = true;
+        setIsSelectionMode(true);
+        setSelectedRowIndices(new Set([index]));
+        // Vibrate if supported
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, 500); // 500ms long press
+    }
+  }, [isSelectionMode, toggleRow]);
+
+  const handleRowMouseEnter = useCallback((index: number) => {
+    if (isDragging && dragStartIndex !== null) {
+      setHasDragged(true); // Mark that user has moved mouse
+      setDragCurrentIndex(index);
+      setSelectedRowIndices(prev => {
+        const newSet = new Set(prev);
+        // Add all rows between start and current
+        const start = Math.min(dragStartIndex, index);
+        const end = Math.max(dragStartIndex, index);
+        for (let i = start; i <= end; i++) {
+          newSet.add(i);
+        }
+        return newSet;
+      });
+    }
+  }, [isDragging, dragStartIndex]);
+
+  const handleRowMouseUp = useCallback(() => {
+    const wasDragging = isDragging;
+    const actuallyDragged = hasDragged;
+    
+    setIsDragging(false);
+    setDragStartIndex(null);
+    setDragCurrentIndex(null);
+    setHasDragged(false);
+    
+    // Only enter selection mode if user actually dragged (not just clicked)
+    if (wasDragging && actuallyDragged && selectedRowIndices.size > 0) {
+      setIsSelectionMode(true);
+    } else if (wasDragging && !actuallyDragged) {
+      // Clear selection if it was just a click without drag
+      setSelectedRowIndices(new Set());
+    }
+    
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, [isDragging, hasDragged, selectedRowIndices.size]);
+
+  const toggleAll = useCallback(() => {
+    setSelectedRowIndices(prev => {
+      if (prev.size === total && total > 0) {
+        return new Set();
+      } else {
+        // Select all indices
+        const newSet = new Set<number>();
+        for (let i = 0; i < total; i++) {
+          newSet.add(i);
+        }
+        return newSet;
+      }
+    });
+  }, [total]);
+
+  const handleExportCSV = useCallback(() => {
+    if (selectedRowIndices.size === 0) return;
+    
+    const header = columns.map(c => c.name).join(',');
+    const csvRows = [];
+    
+    for (const index of selectedRowIndices) {
+      const row = rows.get(index);
+      if (row) {
+        const values = columns.map(c => {
+          const val = row[c.name];
+          const str = String(val ?? '');
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        });
+        csvRows.push(values.join(','));
+      }
+    }
+    
+    const csvContent = [header, ...csvRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [selectedRowIndices, columns, rows]);
+
+  const handleExportJSON = useCallback(() => {
+    if (selectedRowIndices.size === 0) return;
+    
+    const jsonRows = [];
+    for (const index of selectedRowIndices) {
+      const row = rows.get(index);
+      if (row) {
+        jsonRows.push(row);
+      }
+    }
+    
+    const jsonContent = JSON.stringify(jsonRows, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'export.json');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [selectedRowIndices, rows]);
+
+  // Log stats reception
+  useEffect(() => {
+    // console.log(`[DataTable] Stats cache updated`, statsCache);
+  }, []);
 
   // Virtualizer for row virtualization
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -196,6 +393,29 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
     return () => clearTimeout(timer);
   }, [fetchVisibleRows]);
 
+  // Prefetching wrapper
+  const handleFetchStats = useCallback((columnName: string) => {
+    // Fetch requested column
+    getColumnStats(columnName);
+    
+    // Predictive prefetch: Fetch next column too
+    const idx = columns.findIndex(c => c.name === columnName);
+    if (idx !== -1 && idx < columns.length - 1) {
+      const nextCol = columns[idx + 1];
+      // Small delay to prioritize the hovered column's request on the network
+      setTimeout(() => {
+        getColumnStats(nextCol.name);
+      }, 50);
+    }
+  }, [columns, getColumnStats]);
+
+  const handleRenameSubmit = useCallback((newName: string) => {
+    if (editingColumn && newName && newName.trim() !== '' && newName !== editingColumn) {
+      renameColumn(editingColumn, newName);
+    }
+    setEditingColumn(null);
+  }, [editingColumn, renameColumn]);
+
   // --- Render States ---
 
   // Show skeleton while initially loading
@@ -235,104 +455,105 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
         className="flex border-b border-border bg-sidebar z-10 shrink-0"
         style={{ height: HEADER_HEIGHT }}
       >
+
+        {isSelectionMode && (
+          <div
+            className="flex items-center justify-center border-r border-border bg-sidebar z-10 shrink-0"
+            style={{ width: CHECKBOX_WIDTH, minWidth: CHECKBOX_WIDTH }}
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-500 bg-transparent text-accent focus:ring-accent focus:ring-offset-0"
+              checked={total > 0 && selectedRowIndices.size === total}
+              onChange={toggleAll}
+              title="Select All"
+            />
+          </div>
+        )}
         {columns.map((col) => {
           const isSorted = sortState?.column === col.name;
           const isAscending = sortState?.ascending ?? true;
-          const isFiltered = filterState?.column === col.name;
-          const isFiltering = activeFilterColumn === col.name;
 
           return (
             <div
               key={col.name}
-              className={clsx(
-                "group flex items-center px-4 border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none transition-colors",
-                isFiltering ? "bg-surface" : "hover:bg-row-hover/50"
-              )}
+              className="group border-r border-border last:border-r-0 font-sans font-bold text-xs text-secondary uppercase tracking-wider select-none transition-colors relative hover:bg-row-hover/50"
               style={{ width: COLUMN_WIDTH, minWidth: COLUMN_WIDTH }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({ x: e.clientX, y: e.clientY, colName: col.name, type: col.type });
+              }}
             >
-              {isFiltering ? (
-                <div className="flex w-full items-center gap-2">
-                  <input
-                    ref={filterInputRef}
-                    type="text"
-                    value={filterValue}
-                    onChange={(e) => setFilterValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        filterColumn(col.name, filterValue);
-                        setActiveFilterColumn(null);
-                      } else if (e.key === 'Escape') {
-                        setActiveFilterColumn(null);
-                      }
-                    }}
-                    onBlur={() => {
-                      setActiveFilterColumn(null);
-                    }}
-                    className="h-6 w-full rounded border border-accent/50 bg-canvas px-2 text-xs text-primary focus:border-accent focus:outline-none"
-                    placeholder="Filter..."
-                  />
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => setActiveFilterColumn(null)}
-                    className="text-secondary hover:text-primary"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex w-full items-center justify-between gap-2">
-                  <div
-                    className="flex min-w-0 cursor-pointer flex-col gap-0.5"
-                    onClick={() => {
-                      const ascending = isSorted ? !isAscending : true;
-                      sortColumn(col.name, ascending);
-                    }}
-                  >
-                    <span className="truncate text-left">{col.name}</span>
-                    <span className="text-left text-[10px] font-normal lowercase text-secondary/50">
-                      {col.type}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    {isSorted && (
-                      <div className="shrink-0">
-                        {isAscending ? (
-                          <ArrowUp className="h-3 w-3 text-accent" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3 text-accent" />
-                        )}
+              <HeaderStats
+                columnName={col.name}
+                columnType={col.type}
+                onFetchStats={handleFetchStats}
+                registerStatsListener={subscribeToStats}
+                getCachedStats={getCachedStats}
+                disabled={editingColumn === col.name}
+              >
+                <div className="flex items-center px-4 w-full h-full">
+                  {editingColumn === col.name ? (
+                    <input
+                      autoFocus
+                      defaultValue={col.name}
+                      className="w-full bg-surface text-primary px-1 py-0.5 text-xs border border-accent rounded outline-none"
+                      onBlur={(e) => handleRenameSubmit(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleRenameSubmit(e.currentTarget.value);
+                        } else if (e.key === 'Escape') {
+                          setEditingColumn(null);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <div
+                        className="flex min-w-0 cursor-pointer flex-col gap-0.5"
+                        onClick={() => {
+                          const ascending = isSorted ? !isAscending : true;
+                          sortColumn(col.name, ascending);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingColumn(col.name);
+                        }}
+                      >
+                        <span className="truncate text-left">{col.name}</span>
+                        <span className="text-left text-[10px] font-normal lowercase text-secondary/50">
+                          {col.type}
+                        </span>
                       </div>
-                    )}
 
-                    {isFiltered ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          filterColumn(col.name, '');
-                        }}
-                        className="flex items-center gap-1 rounded border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent/20"
-                        title={`Filtered by: ${filterState?.term}`}
-                      >
-                        <Filter className="h-3 w-3" />
-                        <span>FILTER</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveFilterColumn(col.name);
-                          setFilterValue('');
-                        }}
-                        className="flex items-center gap-1 rounded border border-border/40 bg-sidebar/60 px-2 py-1 text-[10px] font-semibold text-secondary hover:border-accent hover:text-accent"
-                      >
-                        <Filter className="h-3 w-3" />
-                        <span>FILTER</span>
-                      </button>
-                    )}
-                  </div>
+                      <div className="flex items-center gap-1">
+                        {isSorted && (
+                          <div className="shrink-0">
+                            {isAscending ? (
+                              <ArrowUp className="h-3 w-3 text-accent" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3 text-accent" />
+                            )}
+                          </div>
+                        )}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            analyzeColumn(col.name);
+                          }}
+                          className="p-1 text-secondary hover:text-accent rounded hover:bg-accent/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Analyze Column Distribution"
+                        >
+                          <BarChart2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </HeaderStats>
             </div>
           );
         })}
@@ -350,7 +571,19 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
             minWidth: '100%',
             position: 'relative',
           }}
+          onMouseLeave={handleRowMouseUp} // Stop drag if leaving the grid area
         >
+          {/* Drag Overlay */}
+          {isDragging && dragStartIndex !== null && dragCurrentIndex !== null && (
+            <div
+              className="absolute left-0 right-0 bg-accent/20 border border-accent/30 pointer-events-none z-20"
+              style={{
+                top: Math.min(dragStartIndex, dragCurrentIndex) * ROW_HEIGHT,
+                height: (Math.abs(dragCurrentIndex - dragStartIndex) + 1) * ROW_HEIGHT,
+              }}
+            />
+          )}
+
           {virtualItems.map((virtualRow) => {
             const row = rows.get(virtualRow.index);
 
@@ -366,9 +599,17 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                     left: 0,
                     height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
-                    width: columns.length * COLUMN_WIDTH,
+                    width: columns.length * COLUMN_WIDTH + (isSelectionMode ? CHECKBOX_WIDTH : 0),
                   }}
                 >
+                  {isSelectionMode && (
+                    <div
+                      className="flex items-center justify-center border-r border-border/30"
+                      style={{ width: CHECKBOX_WIDTH, minWidth: CHECKBOX_WIDTH }}
+                    >
+                      <div className="h-4 w-4 rounded bg-border/30 skeleton-shimmer" />
+                    </div>
+                  )}
                   {columns.map((col) => (
                     <div
                       key={col.name}
@@ -386,7 +627,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
               <div
                 key={virtualRow.index}
                 className={clsx(
-                  "flex border-b border-border/50 hover:bg-row-hover transition-colors duration-75",
+                  "flex border-b border-border/50 hover:bg-row-hover transition-colors duration-75 select-none",
                   virtualRow.index % 2 === 0 ? "bg-surface" : "bg-surface/50"
                 )}
                 style={{
@@ -396,7 +637,28 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                   height: `${virtualRow.size}px`,
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
+                onMouseDown={(e) => handleRowMouseDown(virtualRow.index, e)}
+                onMouseEnter={() => handleRowMouseEnter(virtualRow.index)}
+                onMouseUp={handleRowMouseUp}
+                onTouchStart={(e) => handleRowMouseDown(virtualRow.index, e)}
+                onTouchEnd={handleRowMouseUp}
               >
+                {/* Checkbox Cell */}
+                {isSelectionMode && (
+                  <div
+                    className="flex items-center justify-center border-r border-border/30"
+                    style={{ width: CHECKBOX_WIDTH, minWidth: CHECKBOX_WIDTH }}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-500 bg-transparent text-accent focus:ring-accent focus:ring-offset-0 cursor-pointer"
+                      checked={selectedRowIndices.has(virtualRow.index)}
+                      onChange={() => toggleRow(virtualRow.index)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                )}
+
                 {columns.map((col) => {
                   return (
                     <div
@@ -418,6 +680,31 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
           })}
         </div>
       </div>
+
+
+      {!isDragging && (
+        <SelectionBar
+          selectedCount={selectedRowIndices.size}
+          onExportCSV={handleExportCSV}
+          onExportJSON={handleExportJSON}
+          onClearSelection={() => {
+            setSelectedRowIndices(new Set());
+            setIsSelectionMode(false);
+          }}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          colName={contextMenu.colName}
+          currentType={contextMenu.type}
+          onClose={() => setContextMenu(null)}
+          onRename={() => setEditingColumn(contextMenu.colName)}
+          onTypeChange={(type) => setColumnType(contextMenu.colName, type)}
+        />
+      )}
     </div>
   );
 }

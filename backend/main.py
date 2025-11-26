@@ -8,6 +8,7 @@ Now with WebSocket support for real-time data exploration.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -300,6 +301,40 @@ class WebSocketHandler:
         except Exception as e:
             await self.send_error(f"Filter failed: {e}", action="filtered")
 
+    async def handle_apply_filter(self, filter_payload: dict | None):
+        """Handle apply_filter command."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="filtered")
+            return
+
+        try:
+            # Apply filter
+            dataset.apply_structured_filter(filter_payload)
+
+            # Return updated state and rows
+            state = dataset.get_state()
+            await self.send_response("filtered", {
+                "success": True,
+                "state": state,
+                "total": dataset.row_count,
+            })
+
+            # Send the filtered rows
+            rows = dataset.get_rows(start=0, limit=100)
+            await self.send_response("rows", {
+                "rows": rows,
+                "start": 0,
+                "limit": 100,
+                "total": dataset.row_count,
+                "reset": True
+            })
+
+        except ValueError as e:
+            await self.send_error(str(e), action="filtered")
+        except Exception as e:
+            await self.send_error(f"Filter failed: {e}", action="filtered")
+
     async def handle_reset(self):
         """Handle reset command (clear all sorts/filters)."""
         dataset = _get_dataset_or_none()
@@ -330,6 +365,44 @@ class WebSocketHandler:
 
         except Exception as e:
             await self.send_error(f"Reset failed: {e}", action="reset")
+
+    async def handle_analyze(self, column: str):
+        """Handle analyze command (frequency distribution)."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="analysis_result")
+            return
+
+        try:
+            # Run analysis in a separate thread to avoid blocking the event loop
+            data = await asyncio.to_thread(dataset.get_column_frequency, column)
+            await self.send_response("analysis_result", {
+                "column": column,
+                "data": data
+            })
+        except ValueError as e:
+            await self.send_error(str(e), action="analysis_result")
+        except Exception as e:
+            await self.send_error(f"Analysis failed: {e}", action="analysis_result")
+
+    async def handle_get_stats(self, column: str):
+        """Handle get_stats command (quick column summary)."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="stats_result")
+            return
+
+        try:
+            # Run stats in a separate thread
+            data = await asyncio.to_thread(dataset.get_column_stats_sample, column)
+            await self.send_response("stats_result", {
+                "column": column,
+                "data": data
+            })
+        except ValueError as e:
+            await self.send_error(str(e), action="stats_result")
+        except Exception as e:
+            await self.send_error(f"Stats failed: {e}", action="stats_result")
 
     async def handle_command(self, message: dict):
         """Route a command to the appropriate handler."""
@@ -371,8 +444,21 @@ class WebSocketHandler:
                 if msg.get("column")
                 else self.send_error("Missing 'column' parameter", action="filtered")
             ),
+            "apply_filter": (
+                lambda msg: self.handle_apply_filter(msg.get("filter"))
+            ),
             "reset": (
                 lambda msg: self.handle_reset()
+            ),
+            "analyze": (
+                lambda msg: self.handle_analyze(msg.get("column"))
+                if msg.get("column")
+                else self.send_error("Missing 'column' parameter", action="analysis_result")
+            ),
+            "get_stats": (
+                lambda msg: self.handle_get_stats(msg.get("column"))
+                if msg.get("column")
+                else self.send_error("Missing 'column' parameter", action="stats_result")
             ),
             "ping": (
                 lambda msg: self.send_response("pong")

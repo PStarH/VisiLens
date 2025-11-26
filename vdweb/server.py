@@ -6,8 +6,11 @@ FastAPI application serving both the WebSocket API and the static frontend.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import os
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -29,6 +32,12 @@ logger = logging.getLogger(__name__)
 
 # Global state for initial dataset (set by CLI)
 _initial_dataset_path: str | None = None
+# Unique session ID for this server instance to detect restarts
+SERVER_SESSION_ID = str(uuid.uuid4())
+
+# Constants
+MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100MB
+OPERATION_TIMEOUT_SEC = 5.0
 
 
 def set_initial_dataset_path(path: str) -> None:
@@ -72,7 +81,8 @@ class ColumnsResponse(BaseModel):
 
 class RowsResponse(BaseModel):
     """Response for /rows endpoint."""
-    rows: list[dict[str, Any]]
+    header: list[str]
+    rows: list[list[Any]]
     start: int
     limit: int
     total: int
@@ -96,6 +106,13 @@ class LoadResponse(BaseModel):
     success: bool
     message: str
     info: DatasetInfoResponse | None = None
+
+
+class ErrorResponse(BaseModel):
+    """Standard error response contract."""
+    action: str
+    success: bool = False
+    error: str
 
 
 # --- Helper Functions ---
@@ -129,6 +146,7 @@ class WebSocketHandler:
 
     def __init__(self, websocket: WebSocket):
         self.websocket = websocket
+        self.active_stats_tasks: dict[str, asyncio.Task] = {}
 
     async def send_response(self, action: str, data: Any = None, success: bool = True, error: str | None = None):
         """Send a JSON response to the client."""
@@ -173,9 +191,10 @@ class WebSocketHandler:
         start = max(0, start)
         limit = min(max(1, limit), 10000)
 
-        rows = dataset.get_rows(start=start, limit=limit)
+        result = dataset.get_rows(start=start, limit=limit)
         await self.send_response("rows", {
-            "rows": rows,
+            "header": result["header"],
+            "rows": result["rows"],
             "start": start,
             "limit": limit,
             "total": dataset.row_count
@@ -201,8 +220,25 @@ class WebSocketHandler:
 
     async def handle_load(self, path: str):
         """Handle load command to load a new dataset."""
+        # Check file size
         try:
-            dataset = load_dataset(path)
+            size = os.path.getsize(path)
+            if size > MAX_FILE_SIZE_BYTES:
+                await self.send_error(
+                    f"File too large ({size / 1024 / 1024:.1f}MB). Limit is {MAX_FILE_SIZE_BYTES / 1024 / 1024:.0f}MB.",
+                    action="loaded"
+                )
+                return
+        except OSError as e:
+             await self.send_error(f"Could not access file: {e}", action="loaded")
+             return
+
+        try:
+            # Wrap load in timeout
+            dataset = await asyncio.wait_for(
+                asyncio.to_thread(load_dataset, path),
+                timeout=OPERATION_TIMEOUT_SEC
+            )
             set_current_dataset(dataset)
 
             columns = [
@@ -215,6 +251,8 @@ class WebSocketHandler:
                 "column_count": dataset.column_count,
                 "columns": columns
             })
+        except asyncio.TimeoutError:
+            await self.send_error("Loading timed out.", action="loaded")
         except FileNotFoundError:
             await self.send_error(f"File not found: {path}", action="loaded")
         except Exception as e:
@@ -228,7 +266,12 @@ class WebSocketHandler:
             return
 
         try:
-            dataset.sort_by_column(column, ascending)
+            # Wrap sort in timeout
+            await asyncio.wait_for(
+                asyncio.to_thread(dataset.sort_by_column, column, ascending),
+                timeout=OPERATION_TIMEOUT_SEC
+            )
+            
             state = dataset.get_state()
             await self.send_response("sorted", {
                 "success": True,
@@ -238,13 +281,16 @@ class WebSocketHandler:
 
             rows = dataset.get_rows(start=0, limit=100)
             await self.send_response("rows", {
-                "rows": rows,
+                "header": rows["header"],
+                "rows": rows["rows"],
                 "start": 0,
                 "limit": 100,
                 "total": dataset.row_count,
                 "reset": True
             })
 
+        except asyncio.TimeoutError:
+            await self.send_error("Sort operation timed out.", action="sorted")
         except ValueError as e:
             await self.send_error(str(e), action="sorted")
         except Exception as e:
@@ -259,7 +305,11 @@ class WebSocketHandler:
 
         try:
             if term.strip():
-                dataset.filter_by_column(column, term)
+                # Wrap filter in timeout
+                await asyncio.wait_for(
+                    asyncio.to_thread(dataset.filter_by_column, column, term),
+                    timeout=OPERATION_TIMEOUT_SEC
+                )
             else:
                 dataset.clear_filter()
 
@@ -272,13 +322,57 @@ class WebSocketHandler:
 
             rows = dataset.get_rows(start=0, limit=100)
             await self.send_response("rows", {
-                "rows": rows,
+                "header": rows["header"],
+                "rows": rows["rows"],
                 "start": 0,
                 "limit": 100,
                 "total": dataset.row_count,
                 "reset": True
             })
 
+        except asyncio.TimeoutError:
+            await self.send_error("Filter operation timed out.", action="filtered")
+        except ValueError as e:
+            await self.send_error(str(e), action="filtered")
+        except Exception as e:
+            await self.send_error(f"Filter failed: {e}", action="filtered")
+
+    async def handle_apply_filter(self, filter_payload: dict | None):
+        """Handle apply_filter command."""
+        logger.info(f"Handling apply_filter with payload: {filter_payload}")
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="filtered")
+            return
+
+        try:
+            # Apply filter with timeout
+            await asyncio.wait_for(
+                asyncio.to_thread(dataset.apply_structured_filter, filter_payload),
+                timeout=OPERATION_TIMEOUT_SEC
+            )
+
+            # Return updated state and rows
+            state = dataset.get_state()
+            await self.send_response("filtered", {
+                "success": True,
+                "state": state,
+                "total": dataset.row_count,
+            })
+
+            # Send the filtered rows
+            rows = dataset.get_rows(start=0, limit=100)
+            await self.send_response("rows", {
+                "header": rows["header"],
+                "rows": rows["rows"],
+                "start": 0,
+                "limit": 100,
+                "total": dataset.row_count,
+                "reset": True
+            })
+
+        except asyncio.TimeoutError:
+            await self.send_error("Filter operation timed out.", action="filtered")
         except ValueError as e:
             await self.send_error(str(e), action="filtered")
         except Exception as e:
@@ -302,7 +396,8 @@ class WebSocketHandler:
 
             rows = dataset.get_rows(start=0, limit=100)
             await self.send_response("rows", {
-                "rows": rows,
+                "header": rows["header"],
+                "rows": rows["rows"],
                 "start": 0,
                 "limit": 100,
                 "total": dataset.row_count,
@@ -312,9 +407,173 @@ class WebSocketHandler:
         except Exception as e:
             await self.send_error(f"Reset failed: {e}", action="reset")
 
+    async def handle_analyze(self, column: str):
+        """Handle analyze command (frequency distribution)."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="analysis_result")
+            return
+
+        try:
+            # Run analysis in a separate thread to avoid blocking the event loop
+            data = await asyncio.wait_for(
+                asyncio.to_thread(dataset.get_column_frequency, column),
+                timeout=OPERATION_TIMEOUT_SEC
+            )
+            await self.send_response("analysis_result", {
+                "column": column,
+                "data": data
+            })
+        except asyncio.TimeoutError:
+            await self.send_error(f"Analysis timed out for {column}", action="analysis_result")
+        except ValueError as e:
+            await self.send_error(str(e), action="analysis_result")
+        except Exception as e:
+            await self.send_error(f"Analysis failed: {e}", action="analysis_result")
+
+    async def handle_get_stats(self, column: str, req_id: int | None = None, force: bool = False):
+        """Handle get_stats command (quick column summary)."""
+        # Request Coalescing: If a task for this column is already running, skip
+        if column in self.active_stats_tasks and not force:
+            logger.info(f"Coalescing stats request for column: {column}")
+            return
+
+        async def fetch_and_send():
+            logger.info(f"Task started: stats for {column}")
+            try:
+                dataset = _get_dataset_or_none()
+                if dataset is None:
+                    await self.send_error("No dataset loaded", action="stats_result")
+                    return
+
+                # Run stats in a separate thread with timeout
+                try:
+                    data = await asyncio.wait_for(
+                        asyncio.to_thread(dataset.get_column_stats_sample, column),
+                        timeout=OPERATION_TIMEOUT_SEC
+                    )
+                    logger.info(f"Task finished: stats for {column}")
+                    
+                    # Minimal response payload
+                    response_data = {
+                        "column": column,
+                        "data": data
+                    }
+                    if req_id is not None:
+                        response_data["req_id"] = req_id
+
+                    await self.send_response("stats_result", response_data)
+
+                except asyncio.TimeoutError:
+                    logger.warning(f"Task timeout: stats for {column}")
+                    # Return placeholder stats on timeout
+                    response_data = {
+                        "column": column,
+                        "data": None,
+                        "timed_out": True
+                    }
+                    if req_id is not None:
+                        response_data["req_id"] = req_id
+                    
+                    await self.send_response("stats_result", response_data)
+                    
+            except ValueError as e:
+                logger.error(f"Task error: stats for {column} - {e}")
+                await self.send_error(str(e), action="stats_result")
+            except Exception as e:
+                logger.error(f"Task failed: stats for {column} - {e}")
+                await self.send_error(f"Stats failed: {e}", action="stats_result")
+            finally:
+                # Remove self from active tasks
+                self.active_stats_tasks.pop(column, None)
+
+        # Create and track the task
+        task = asyncio.create_task(fetch_and_send())
+        self.active_stats_tasks[column] = task
+        # Note: We do NOT await the task here, allowing the loop to process other messages
+
+    async def handle_rename_col(self, col_id: str, new_name: str):
+        """Handle rename_col command."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="rename_col")
+            return
+
+        try:
+            await asyncio.to_thread(dataset.rename_column, col_id, new_name)
+            
+            # Return updated columns
+            columns = [
+                {"name": c.name, "type": c.type, "width": c.width}
+                for c in dataset.get_columns()
+            ]
+            await self.send_response("columns", {
+                "columns": columns,
+                "count": len(columns)
+            })
+            
+            # Also refresh rows header
+            rows = dataset.get_rows(start=0, limit=100)
+            await self.send_response("rows", {
+                "header": rows["header"],
+                "rows": rows["rows"],
+                "start": 0,
+                "limit": 100,
+                "total": dataset.row_count,
+                "reset": True
+            })
+
+        except ValueError as e:
+            await self.send_error(str(e), action="rename_col")
+        except Exception as e:
+            await self.send_error(f"Rename failed: {e}", action="rename_col")
+
+    async def handle_set_col_type(self, col_id: str, new_type: str):
+        """Handle set_col_type command."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="set_col_type")
+            return
+
+        try:
+            # This might take a moment if it reloads the sheet
+            await asyncio.wait_for(
+                asyncio.to_thread(dataset.set_column_type, col_id, new_type),
+                timeout=OPERATION_TIMEOUT_SEC * 2 # Give it more time for reload
+            )
+            
+            # Return updated columns
+            columns = [
+                {"name": c.name, "type": c.type, "width": c.width}
+                for c in dataset.get_columns()
+            ]
+            await self.send_response("columns", {
+                "columns": columns,
+                "count": len(columns)
+            })
+            
+            # Refresh rows with new types
+            rows = dataset.get_rows(start=0, limit=100)
+            await self.send_response("rows", {
+                "header": rows["header"],
+                "rows": rows["rows"],
+                "start": 0,
+                "limit": 100,
+                "total": dataset.row_count,
+                "reset": True
+            })
+
+        except asyncio.TimeoutError:
+            await self.send_error("Type change timed out.", action="set_col_type")
+        except ValueError as e:
+            await self.send_error(str(e), action="set_col_type")
+        except Exception as e:
+            await self.send_error(f"Type change failed: {e}", action="set_col_type")
+
     async def handle_command(self, message: dict):
         """Route a command to the appropriate handler."""
         action = message.get("action")
+        logger.info(f"Received command action: {action}")
 
         handlers = {
                 "get_columns": (
@@ -350,11 +609,44 @@ class WebSocketHandler:
                     if msg.get("column")
                     else self.send_error("Missing 'column' parameter", action="filtered")
                 ),
+                "apply_filter": (
+                    lambda msg: self.handle_apply_filter(msg.get("filter_payload"))
+                ),
                 "reset": (
                     lambda msg: self.handle_reset()
                 ),
+                "analyze": (
+                    lambda msg: self.handle_analyze(msg.get("column"))
+                    if msg.get("column")
+                    else self.send_error("Missing 'column' parameter", action="analysis_result")
+                ),
+                "get_stats": (
+                    lambda msg: self.handle_get_stats(
+                        msg.get("column"),
+                        msg.get("req_id"),
+                        msg.get("force", False)
+                    )
+                    if msg.get("column")
+                    else self.send_error("Missing 'column' parameter", action="stats_result")
+                ),
                 "ping": (
                     lambda msg: self.send_response("pong")
+                ),
+                "rename_col": (
+                    lambda msg: self.handle_rename_col(
+                        msg.get("col_id"),
+                        msg.get("new_name")
+                    )
+                    if msg.get("col_id") and msg.get("new_name")
+                    else self.send_error("Missing parameters", action="rename_col")
+                ),
+                "set_col_type": (
+                    lambda msg: self.handle_set_col_type(
+                        msg.get("col_id"),
+                        msg.get("type")
+                    )
+                    if msg.get("col_id") and msg.get("type")
+                    else self.send_error("Missing parameters", action="set_col_type")
                 ),
         }
 
@@ -391,6 +683,12 @@ def create_app() -> FastAPI:
         handler = WebSocketHandler(websocket)
         logger.info("WebSocket client connected")
 
+        # Send server restart/hello event
+        await handler.send_response("server_restart", {
+            "session_id": SERVER_SESSION_ID,
+            "message": "Server ready"
+        })
+
         try:
             while True:
                 try:
@@ -403,8 +701,14 @@ def create_app() -> FastAPI:
 
         except WebSocketDisconnect:
             logger.info("WebSocket client disconnected")
+            # Cancel active tasks
+            for task in handler.active_stats_tasks.values():
+                task.cancel()
         except Exception as e:
             logger.error(f"WebSocket error: {e}")
+            # Cancel active tasks
+            for task in handler.active_stats_tasks.values():
+                task.cancel()
 
     # Serve static frontend files
     # The static directory should contain the built React app

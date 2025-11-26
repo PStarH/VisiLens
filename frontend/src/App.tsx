@@ -6,12 +6,42 @@
  */
 
 import { DataTable } from './components/DataTable';
-import { Database, Zap } from 'lucide-react';
+import { AnalysisSidebar } from './components/AnalysisSidebar';
+import { FilterBar, type FilterPayload } from './components/FilterBar';
+import { Database, Zap, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 import { useVisiLensSocket } from './hooks/useVisiLensSocket';
+import { useState, useEffect } from 'react';
 
 function App() {
   const socket = useVisiLensSocket();
-  const { total } = socket;
+  const { total, analysisData, isAnalyzing, columns } = socket;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Open sidebar when analysis starts or new data arrives
+  useEffect(() => {
+    if (isAnalyzing || analysisData) {
+      const timer = setTimeout(() => setIsSidebarOpen(true), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isAnalyzing, analysisData]);
+
+  // Handler for filter bar
+  // Handler for filter bar
+  const handleApplyFilter = (filter: FilterPayload) => {
+    console.log('[App] handleApplyFilter received:', filter);
+    if (socket.applyFilter) {
+      console.log('[App] Calling socket.applyFilter');
+      socket.applyFilter(filter);
+    } else {
+      console.error('[App] socket.applyFilter is not defined');
+    }
+  };
+
+  const handleResetFilter = () => {
+    // Reset filter
+    socket.applyFilter && socket.applyFilter("reset");
+  };
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-canvas text-primary font-sans">
@@ -24,6 +54,21 @@ function App() {
           <span className="text-sm tracking-tight text-primary">VisiLens</span>
         </div>
         <div className="ml-auto flex items-center gap-4">
+          <button
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              isFilterOpen 
+                ? 'bg-accent text-white shadow-sm' 
+                : 'bg-surface text-secondary hover:text-primary hover:bg-surface/80 border border-border/50'
+            }`}
+          >
+            <Filter className="h-3.5 w-3.5" />
+            <span>Filter</span>
+            {isFilterOpen ? <ChevronUp className="h-3 w-3 ml-0.5" /> : <ChevronDown className="h-3 w-3 ml-0.5" />}
+          </button>
+          
+          <div className="h-4 w-px bg-border/50" />
+
           <div className="flex items-center gap-1.5 text-xs text-secondary">
             <Zap className="h-3 w-3 text-accent" />
             <span>WebSocket</span>
@@ -34,9 +79,31 @@ function App() {
         </div>
       </header>
 
+      {/* FilterBar - Collapsible */}
+      {isFilterOpen && (
+        <div className="border-b border-border bg-surface animate-in slide-in-from-top-2 duration-200">
+          <div className="px-4 py-4">
+            <FilterBar
+              columns={columns}
+              onApplyFilter={handleApplyFilter}
+              onResetFilter={handleResetFilter}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden relative">
-        <DataTable socket={socket} />
+      <main className="flex-1 overflow-hidden relative flex">
+        <div className="flex-1 overflow-hidden relative">
+          <DataTable socket={socket} />
+        </div>
+        <AnalysisSidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          columnName={analysisData?.column ?? (isAnalyzing ? "..." : null)}
+          data={analysisData?.data ?? []}
+          isLoading={isAnalyzing}
+        />
       </main>
 
       {/* Status Bar */}
