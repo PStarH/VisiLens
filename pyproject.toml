@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vdweb"
-version = "0.1.1"
+version = "0.2.0"
 description = "Excel for Developers - A fast, local-first web GUI for exploring data with VisiData"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -47,8 +47,8 @@ Repository = "https://github.com/PStarH/VisiLens"
 Issues = "https://github.com/PStarH/VisiLens/issues"
 
 [project.scripts]
-vdweb = "vdweb.cli:main"
 visilens = "vdweb.cli:main"
+vdweb = "vdweb.cli:main"
 
 [tool.setuptools]
 packages = ["vdweb"]

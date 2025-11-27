@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting VisiLens v0.1.0 Build Protocol..."
+echo "🚀 Starting VisiLens v0.2.0 Build Protocol..."
 
 # 1. Build Frontend
 echo "📦 Building Frontend..."

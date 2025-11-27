@@ -1,7 +1,7 @@
 """
-VdWeb CLI Entry Point
+VisiLens CLI Entry Point
 
-Launches the VdWeb server and opens the web interface.
+Launches the VisiLens server and opens the web interface.
 """
 
 from __future__ import annotations
@@ -35,17 +35,17 @@ def is_port_in_use(port: int) -> bool:
 @click.option('--no-browser', is_flag=True, help='Don\'t open browser automatically')
 def main(filename: str | None, host: str, port: int, no_browser: bool):
     """
-    VdWeb - Excel for Developers
+    VisiLens - Excel for Developers
 
     Launch a local web GUI for exploring data with VisiData.
 
     Examples:
 
-        vdweb data.csv
+        visilens data.csv
 
-        vdweb employees.parquet --port 9000
+        visilens employees.parquet --port 9000
 
-        vdweb dataset.json --no-browser
+        visilens dataset.json --no-browser
     """
     # Set initial dataset if provided
     if filename:
@@ -81,7 +81,7 @@ def main(filename: str | None, host: str, port: int, no_browser: bool):
 
     # Display startup message
     click.echo("=" * 60)
-    click.echo("VdWeb - Excel for Developers")
+    click.echo("VisiLens - Excel for Developers")
     click.echo("=" * 60)
     if filename:
         click.echo(f"Dataset: {filename}")
@@ -101,7 +101,7 @@ def main(filename: str | None, host: str, port: int, no_browser: bool):
             access_log=False  # Reduce noise
         )
     except KeyboardInterrupt:
-        click.echo("\n\nShutting down VdWeb. Goodbye!")
+        click.echo("\n\nShutting down VisiLens. Goodbye!")
         sys.exit(0)
 
 

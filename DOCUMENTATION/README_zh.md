@@ -15,12 +15,17 @@
   [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
   [![React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](https://reactjs.org/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
-  [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/0.1.1/)
+  [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/)
 
   [English](../README.md) • [简体中文](README_zh.md) • [Español](README_es.md) • [日本語](README_ja.md) • [Русский](README_ru.md)
 
   [特性](#特性) • [安装](#安装) • [使用](#使用) • [架构](#架构) • [贡献](#贡献)
 </div>
+
+---
+
+> **📦 包名说明**  
+> PyPI 上的包名是 **`vdweb`**（使用 `pip install vdweb` 安装），但安装后可以使用 `visilens` 或 `vdweb` 作为命令行工具。我们推荐使用 `visilens` 以与项目名称保持一致。
 
 ---
 
@@ -35,8 +40,10 @@
 
 ## ✨ 特性
 
-- **即时数据可视化：** 只需运行 `vdweb data.csv`，即可瞬间可视化大型数据集。
+- **即时数据可视化：** 只需运行 `visilens data.csv`，即可瞬间可视化大型数据集。
 - **超强的后端排序与过滤：** 依托 VisiData 引擎，对数百万行数据执行复杂查询依然流畅。
+- **列操作：** 使用直观的上下文菜单更改列类型、重命名列及编辑数据。
+- **高级过滤：** 支持多条件过滤及正则表达式模式匹配。
 - **虚拟化表格组件：** 基于 React 的虚拟化表格（数据网格），长表滚动依然顺滑。
 - **零配置上手：** 无需额外数据库或服务，直接作为独立的 CSV/Parquet 查看器使用。
 
@@ -65,7 +72,7 @@ VisiLens 依托 VisiData 的加载器，开箱即用地支持多种格式：
 VisiLens 已发布为 Python 包。
 
 ```bash
-pip install vdweb
+pip install visilens
 ```
 
 *注意：VisiLens 需要 Python 3.10 或更高版本。*
@@ -78,19 +85,19 @@ VisiLens 的核心使用方式是通过命令行。
 
 ```bash
 # 打开一个 CSV 文件
-vdweb data.csv
+visilens data.csv
 
 # 打开一个 Parquet 文件
-vdweb large-dataset.parquet
+visilens large-dataset.parquet
 
 # 打开一个 Excel 文件
-vdweb spreadsheet.xlsx
+visilens spreadsheet.xlsx
 
 # 启动时不自动打开浏览器
-vdweb data.json --no-browser
+visilens data.json --no-browser
 
 # 指定自定义端口
-vdweb data.csv --port 9000
+visilens data.csv --port 9000
 ```
 
 ### Web 界面
@@ -99,8 +106,9 @@ vdweb data.csv --port 9000
 
 1.  **查看数据：** 高效流畅地滚动浏览您的数据集。
 2.  **排序：** 点击列标题即可进行升序/降序排序。
-3.  **过滤：** 使用过滤输入框在列内进行搜索。
-4.  **加载新数据：** (即将推出) 直接将文件拖放到窗口中。
+3.  **过滤：** 使用强大的过滤条应用多条件复杂查询。
+4.  **列操作：** 右键单击列标题可更改类型、重命名列或访问高级选项。
+5.  **加载新数据：** (即将推出) 直接将文件拖放到窗口中。
 
 ## 🏗 架构
 
@@ -117,10 +125,11 @@ VisiLens 建立在为性能而生的强大现代技术栈之上：
 我们正在积极努力，致力于将 VisiLens 打造成最强的本地数据浏览工具。
 
 - [x] **v0.1:** 核心引擎，虚拟滚动，排序，过滤。
+- [x] **v0.2:** 列类型转换，列重命名，高级过滤，上下文菜单。
 - [ ] **Jupyter 集成：** 直接从 Notebook 单元格启动 VisiLens (`visilens.view(df)`)。
 - [ ] **拖放文件加载**
 - [ ] **绘图：** 通过 Vega-Lite 快速绘制直方图和散点图。
-- [ ] **编辑：** 编辑单元格并将更改保存回 CSV/Parquet。
+- [ ] **单元格编辑：** 编辑单元格并将更改保存回 CSV/Parquet。
 - [ ] **SQL 支持：** 直接连接到 SQLite/Postgres/DuckDB。
 
 ## 🛠 开发
@@ -182,15 +191,15 @@ VisiLens 建立在为性能而生的强大现代技术栈之上：
   这会在 `frontend/dist/` 下生成一个生产包，该包会被复制到 `vdweb/static/` 以供发布。最终用户只需运行：
 
   ```bash
-  vdweb path/to/data.csv
+  visilens path/to/data.csv
   ```
 
 ## 🤝 贡献
 
 ### 对于贡献者：项目结构
 
-- **Python 包 (`vdweb/`):** 这是发布到 PyPI 的可安装包。CLI 入口点 `vdweb` / `visilens` 都解析为 `vdweb.cli:main`，如 `pyproject.toml` 中配置的那样。
-- **开发后端 (`backend/`):** 一个仅用于本地开发的独立 FastAPI 应用程序 (`uvicorn backend.main:app`)。它镜像了打包后后端的行为，但并非用户安装 `vdweb` 时导入的内容。
+- **Python 包 (`vdweb/`):** 这是发布到 PyPI 的可安装包，名为 `vdweb`。CLI 入口点 `visilens` 和 `vdweb` 都解析为 `vdweb.cli:main`，如 `pyproject.toml` 中配置的那样。
+- **开发后端 (`backend/`):** 一个仅用于本地开发的独立 FastAPI 应用程序 (`uvicorn backend.main:app`)。它镜像了打包后后端的行为，但并非用户安装 `visilens` 时导入的内容。
 - **核心逻辑：** VisiData 驱动的数据访问层位于 `vdweb/core.py`（并在 `backend/core.py` 中为开发应用程序镜像）。如果您想更改数据的加载/排序/过滤方式，请从这里开始。
 
 ### 典型的贡献者工作流程

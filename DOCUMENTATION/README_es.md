@@ -35,7 +35,7 @@ Explorar datos no debería implicar escribir siempre el mismo código en Pandas 
 
 ## ✨ Características
 
-- **Visualización instantánea de datos:** basta con ejecutar `vdweb data.csv` para visualizar al instante conjuntos de datos grandes.
+- **Visualización instantánea de datos:** basta con ejecutar `visilens data.csv` para visualizar al instante conjuntos de datos grandes.
 - **Ordenación y filtrado desde el backend:** ejecuta consultas complejas sobre millones de filas apoyándote en el motor de VisiData.
 - **Cuadrícula de datos virtualizada y ligera:** vista de tabla basada en React, diseñada para un desplazamiento fluido incluso con muchas filas.
 - **Cero configuración:** no necesitas montar una base de datos; funciona como visor independiente de CSV/Parquet.
@@ -65,7 +65,7 @@ Nos tomamos el rendimiento muy en serio. Así se comporta VisiLens al abrir un c
 VisiLens está disponible como un paquete de Python.
 
 ```bash
-pip install vdweb
+pip install visilens
 ```
 
 *Nota: VisiLens requiere Python 3.10 o superior.*
@@ -78,19 +78,19 @@ La forma principal de usar VisiLens es a través de la línea de comandos.
 
 ```bash
 # Abrir un archivo CSV
-vdweb data.csv
+visilens data.csv
 
 # Abrir un archivo Parquet
-vdweb large-dataset.parquet
+visilens large-dataset.parquet
 
 # Abrir un archivo Excel
-vdweb spreadsheet.xlsx
+visilens spreadsheet.xlsx
 
 # Lanzar sin abrir el navegador automáticamente
-vdweb data.json --no-browser
+visilens data.json --no-browser
 
 # Especificar un puerto personalizado
-vdweb data.csv --port 9000
+visilens data.csv --port 9000
 ```
 
 ### Interfaz Web
@@ -182,15 +182,15 @@ Estamos trabajando activamente para hacer de VisiLens el compañero de datos loc
   Esto produce un paquete de producción bajo `frontend/dist/` que se copia en `vdweb/static/` para lanzamientos. Los usuarios finales solo ejecutan:
 
   ```bash
-  vdweb path/to/data.csv
+  visilens path/to/data.csv
   ```
 
 ## 🤝 Contribución
 
 ### Para Colaboradores: dónde viven las cosas
 
-- **Paquete Python (`vdweb/`):** Este es el paquete instalable publicado en PyPI. Los puntos de entrada CLI `vdweb` / `visilens` se resuelven en `vdweb.cli:main` como se configura en `pyproject.toml`.
-- **Backend de desarrollo (`backend/`):** Una aplicación FastAPI separada utilizada solo para desarrollo local (`uvicorn backend.main:app`). Refleja el comportamiento del backend empaquetado pero no es lo que los usuarios importan cuando instalan `vdweb`.
+- **Paquete Python (`vdweb/`):** Este es el paquete instalable publicado en PyPI. Los puntos de entrada CLI `visilens` / `visilens` se resuelven en `visilens.cli:main` como se configura en `pyproject.toml`.
+- **Backend de desarrollo (`backend/`):** Una aplicación FastAPI separada utilizada solo para desarrollo local (`uvicorn backend.main:app`). Refleja el comportamiento del backend empaquetado pero no es lo que los usuarios importan cuando instalan `visilens`.
 - **Lógica central:** La capa de acceso a datos impulsada por VisiData vive en `vdweb/core.py` (y se refleja en `backend/core.py` para la aplicación de desarrollo). Si desea cambiar cómo se cargan/ordenan/filtran los datos, comience aquí.
 
 ### Flujo de trabajo típico del colaborador

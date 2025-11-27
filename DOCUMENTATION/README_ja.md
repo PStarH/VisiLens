@@ -35,7 +35,7 @@
 
 ## ✨ 機能
 
-- **瞬時のデータ可視化:** `vdweb data.csv` を実行するだけで、大規模なデータセットを即座に可視化できます。
+- **瞬時のデータ可視化:** `visilens data.csv` を実行するだけで、大規模なデータセットを即座に可視化できます。
 - **バックエンド駆動型のソートとフィルタリング:** VisiDataエンジンを用いて、数百万行規模の複雑なクエリも軽快に処理します。
 - **軽量なデータテーブル:** 仮想化されたReactベースのテーブルビューにより、大量行でもスムーズにスクロールできます。
 - **ゼロコンフィグ:** データベースのセットアップは不要で、スタンドアロンのCSV/Parquetビューアとしてすぐに使えます。
@@ -65,7 +65,7 @@ VisiLens は VisiData のローダーを活用して、さまざまな形式を�
 VisiLens は Python パッケージとして入手可能です。
 
 ```bash
-pip install vdweb
+pip install visilens
 ```
 
 *注意: VisiLens には Python 3.10 以降が必要です。*
@@ -78,19 +78,19 @@ VisiLens を使用する主な方法は、コマンドラインを使用する�
 
 ```bash
 # CSV ファイルを開く
-vdweb data.csv
+visilens data.csv
 
 # Parquet ファイルを開く
-vdweb large-dataset.parquet
+visilens large-dataset.parquet
 
 # Excel ファイルを開く
-vdweb spreadsheet.xlsx
+visilens spreadsheet.xlsx
 
 # ブラウザを自動的に開かずに起動する
-vdweb data.json --no-browser
+visilens data.json --no-browser
 
 # カスタムポートを指定する
-vdweb data.csv --port 9000
+visilens data.csv --port 9000
 ```
 
 ### Web インターフェース
@@ -182,15 +182,15 @@ VisiLens は、パフォーマンスのために設計された堅牢で最新�
   これにより、`frontend/dist/` 下に本番バンドルが生成され、リリースのために `vdweb/static/` にコピーされます。エンドユーザーは以下を実行するだけです。
 
   ```bash
-  vdweb path/to/data.csv
+  visilens path/to/data.csv
   ```
 
 ## 🤝 貢献
 
 ### 貢献者のために：何がどこにあるか
 
-- **Python パッケージ (`vdweb/`):** これは PyPI に公開されるインストール可能なパッケージです。CLI エントリポイント `vdweb` / `visilens` は、`pyproject.toml` で構成されているように、どちらも `vdweb.cli:main` に解決されます。
-- **開発バックエンド (`backend/`):** ローカル開発のみに使用される別の FastAPI アプリ (`uvicorn backend.main:app`) です。パッケージ化されたバックエンドの動作をミラーリングしますが、ユーザーが `vdweb` をインストールするときにインポートするものではありません。
+- **Python パッケージ (`vdweb/`):** これは PyPI に公開されるインストール可能なパッケージです。CLI エントリポイント `visilens` / `visilens` は、`pyproject.toml` で構成されているように、どちらも `visilens.cli:main` に解決されます。
+- **開発バックエンド (`backend/`):** ローカル開発のみに使用される別の FastAPI アプリ (`uvicorn backend.main:app`) です。パッケージ化されたバックエンドの動作をミラーリングしますが、ユーザーが `visilens` をインストールするときにインポートするものではありません。
 - **コアロジック:** VisiData 駆動のデータアクセスレイヤーは `vdweb/core.py` にあります（開発アプリのために `backend/core.py` にミラーリングされています）。データのロード/ソート/フィルタリング方法を変更したい場合は、ここから始めてください。
 
 ### 一般的な貢献者のワークフロー

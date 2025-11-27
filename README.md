@@ -15,12 +15,17 @@
   [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
   [![React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](https://reactjs.org/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
-  [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/0.1.1/)
+  [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/)
 
   [English](README.md) • [简体中文](DOCUMENTATION/README_zh.md) • [Español](DOCUMENTATION/README_es.md) • [日本語](DOCUMENTATION/README_ja.md) • [Русский](DOCUMENTATION/README_ru.md)
 
   [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](#contributing)
 </div>
+
+---
+
+> **📦 Package Name Notice**  
+> The PyPI package name is **`vdweb`** (install with `pip install vdweb`), but you can use either `visilens` or `vdweb` as the command-line tool after installation. We recommend using `visilens` for consistency with the project name.
 
 ---
 
@@ -35,8 +40,10 @@ Data exploration shouldn't require writing boilerplate Pandas code or waiting fo
 
 ## ✨ Features
 
-- **Instant Data Visualization:** Just run `vdweb data.csv` to visualize large datasets instantly.
+- **Instant Data Visualization:** Just run `visilens data.csv` to visualize large datasets instantly.
 - **Backend-powered Sorting & Filtering:** Perform complex queries on millions of rows using the VisiData engine.
+- **Column Manipulation:** Change column types, rename columns, and edit data with an intuitive context menu.
+- **Advanced Filtering:** Apply multiple filter conditions with support for regex pattern matching.
 - **Lightweight Data Grid:** A virtualized React-based table view for smooth scrolling.
 - **Zero Config:** No database setup required. Works as a standalone CSV/Parquet viewer.
 
@@ -65,7 +72,7 @@ We take performance seriously. Here is how VisiLens compares when opening a **1,
 VisiLens is available as a Python package.
 
 ```bash
-pip install vdweb
+pip install visilens
 ```
 
 *Note: VisiLens requires Python 3.10 or higher.*
@@ -78,19 +85,19 @@ The primary way to use VisiLens is via the command line.
 
 ```bash
 # Open a CSV file
-vdweb data.csv
+visilens data.csv
 
 # Open a Parquet file
-vdweb large-dataset.parquet
+visilens large-dataset.parquet
 
 # Open an Excel file
-vdweb spreadsheet.xlsx
+visilens spreadsheet.xlsx
 
 # Launch without opening the browser automatically
-vdweb data.json --no-browser
+visilens data.json --no-browser
 
 # Specify a custom port
-vdweb data.csv --port 9000
+visilens data.csv --port 9000
 ```
 
 ### Web Interface
@@ -99,8 +106,9 @@ Once launched, VisiLens opens in your default browser (usually `http://localhost
 
 1.  **View Data:** Scroll through your dataset efficiently.
 2.  **Sort:** Click column headers to sort ascending/descending.
-3.  **Filter:** Use the filter inputs to search within columns.
-4.  **Load New Data:** (Coming Soon) Drag and drop files directly into the window.
+3.  **Filter:** Use the power filter bar to apply complex queries with multiple conditions.
+4.  **Column Operations:** Right-click column headers to change types, rename columns, or access advanced options.
+5.  **Load New Data:** (Coming Soon) Drag and drop files directly into the window.
 
 ## 🏗 Architecture
 
@@ -119,10 +127,11 @@ We are actively working on making VisiLens the ultimate local data companion.
 For a detailed breakdown of our feature strategy and technical implementation plan, please see [ROADMAP.md](DOCUMENTATION/ROADMAP.md).
 
 - [x] **v0.1:** Core Engine, Virtual Scrolling, Sorting, Filtering.
+- [x] **v0.2:** Column Type Conversion, Column Renaming, Advanced Filtering, Context Menu.
 - [ ] **Jupyter Integration:** Launch VisiLens directly from a notebook cell (`visilens.view(df)`).
 - [ ] **Drag-and-drop file loading**
 - [ ] **Plotting:** Quick histograms and scatter plots via Vega-Lite.
-- [ ] **Editing:** Edit cells and save changes back to CSV/Parquet.
+- [ ] **Cell Editing:** Edit cells and save changes back to CSV/Parquet.
 - [ ] **SQL Support:** Connect directly to SQLite/Postgres/DuckDB.
 
 ## 🛠 Development
@@ -184,7 +193,7 @@ Want to contribute? Great! Here's how to set up the development environment.
   This produces a production bundle under `frontend/dist/` which is copied into `vdweb/static/` for releases. End users then just run:
 
   ```bash
-  vdweb path/to/data.csv
+  visilens path/to/data.csv
   ```
 
 ## 🤝 Contributing
@@ -193,8 +202,8 @@ For more details, please see [CONTRIBUTING.md](DOCUMENTATION/CONTRIBUTING.md).
 
 ### For Contributors: where things live
 
-- **Python package (`vdweb/`):** This is the installable package published to PyPI. The CLI entrypoints `vdweb` / `visilens` both resolve to `vdweb.cli:main` as configured in `pyproject.toml`.
-- **Dev backend (`backend/`):** A separate FastAPI app used only for local development (`uvicorn backend.main:app`). It mirrors the behavior of the packaged backend but is not what users import when they install `vdweb`.
+- **Python package (`vdweb/`):** This is the installable package published to PyPI as `vdweb`. The CLI entrypoints `visilens` and `vdweb` both resolve to `vdweb.cli:main` as configured in `pyproject.toml`.
+- **Dev backend (`backend/`):** A separate FastAPI app used only for local development (`uvicorn backend.main:app`). It mirrors the behavior of the packaged backend but is not what users import when they install `visilens`.
 - **Core logic:** The VisiData-powered data access layer lives in `vdweb/core.py` (and is mirrored in `backend/core.py` for the dev app). If you want to change how data is loaded/sorted/filtered, start here.
 
 ### Typical contributor workflow
