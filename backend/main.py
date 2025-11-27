@@ -404,6 +404,78 @@ class WebSocketHandler:
         except Exception as e:
             await self.send_error(f"Stats failed: {e}", action="stats_result")
 
+    async def handle_set_col_type(self, col_id: str, type_str: str):
+        """Handle set_col_type command to change a column's type."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="columns")
+            return
+
+        try:
+            # Change the column type
+            dataset.set_column_type(col_id, type_str)
+
+            # Send updated columns list
+            columns = [
+                {"name": c.name, "type": c.type, "width": c.width}
+                for c in dataset.get_columns()
+            ]
+            await self.send_response("columns", {
+                "columns": columns,
+                "count": len(columns)
+            })
+
+            # Send refreshed rows to show new typed values
+            rows = dataset.get_rows(start=0, limit=100)
+            await self.send_response("rows", {
+                "rows": rows,
+                "start": 0,
+                "limit": 100,
+                "total": dataset.row_count,
+                "reset": True  # Signal frontend to clear cache
+            })
+
+        except ValueError as e:
+            await self.send_error(str(e), action="columns")
+        except Exception as e:
+            await self.send_error(f"Type change failed: {e}", action="columns")
+
+    async def handle_rename_col(self, col_id: str, new_name: str):
+        """Handle rename_col command to rename a column."""
+        dataset = _get_dataset_or_none()
+        if dataset is None:
+            await self.send_error("No dataset loaded", action="columns")
+            return
+
+        try:
+            # Rename the column
+            dataset.rename_column(col_id, new_name)
+
+            # Send updated columns list
+            columns = [
+                {"name": c.name, "type": c.type, "width": c.width}
+                for c in dataset.get_columns()
+            ]
+            await self.send_response("columns", {
+                "columns": columns,
+                "count": len(columns)
+            })
+
+            # Send refreshed rows with new column names
+            rows = dataset.get_rows(start=0, limit=100)
+            await self.send_response("rows", {
+                "rows": rows,
+                "start": 0,
+                "limit": 100,
+                "total": dataset.row_count,
+                "reset": True  # Signal frontend to clear cache
+            })
+
+        except ValueError as e:
+            await self.send_error(str(e), action="columns")
+        except Exception as e:
+            await self.send_error(f"Rename failed: {e}", action="columns")
+
     async def handle_command(self, message: dict):
         """Route a command to the appropriate handler."""
         action = message.get("action")
@@ -462,6 +534,22 @@ class WebSocketHandler:
             ),
             "ping": (
                 lambda msg: self.send_response("pong")
+            ),
+            "set_col_type": (
+                lambda msg: self.handle_set_col_type(
+                    msg.get("col_id"),
+                    msg.get("type")
+                )
+                if msg.get("col_id") and msg.get("type")
+                else self.send_error("Missing 'col_id' or 'type' parameter", action="columns")
+            ),
+            "rename_col": (
+                lambda msg: self.handle_rename_col(
+                    msg.get("col_id"),
+                    msg.get("new_name")
+                )
+                if msg.get("col_id") and msg.get("new_name")
+                else self.send_error("Missing 'col_id' or 'new_name' parameter", action="columns")
             ),
         }
 

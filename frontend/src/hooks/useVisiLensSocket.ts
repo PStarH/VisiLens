@@ -113,6 +113,8 @@ export function useVisiLensSocket() {
           switch (message.action) {
             case 'columns':
               setColumns(message.data.columns);
+              // Clear stats cache when columns change (rename or type change)
+              statsCacheRef.current.clear();
               break;
             case 'rows': {
               const { header, rows: newRowsData, start, total: totalRows, reset } = message.data;

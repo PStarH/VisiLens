@@ -447,6 +447,19 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
 
   return (
     <div className="relative flex h-full flex-col bg-surface text-primary font-mono text-sm">
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2 text-xs text-destructive flex items-center justify-between">
+          <span>{error}</span>
+          <button 
+            onClick={reconnect}
+            className="hover:underline font-semibold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Connection Status Badge */}
       <ConnectionStatusBadge status={status} onReconnect={reconnect} />
 

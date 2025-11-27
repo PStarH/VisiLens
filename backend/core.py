@@ -399,6 +399,90 @@ class DatasetHandle:
             self._stats_cache.clear()
             self._sample_rows = None
 
+    def set_column_type(self, col_name: str, new_type_str: str) -> None:
+        """
+        Change a column's type and convert underlying data.
+        
+        This properly updates VisiData's type system and clears caches
+        to ensure the change persists across all operations.
+        
+        Args:
+            col_name: Name of the column to change
+            new_type_str: Type string ("int", "float", "date", "str")
+            
+        Raises:
+            ValueError: If column not found or type not recognized
+        """
+        with self._lock:
+            # Find the column
+            col = next((c for c in self.sheet.columns if c.name == col_name), None)
+            if col is None:
+                raise ValueError(f"Column '{col_name}' not found")
+            
+            # Map string type to VisiData type object
+            type_map = {
+                'int': int,
+                'integer': int,
+                'float': float,
+                'str': str,
+                'string': str,
+                'date': visidata.date,
+                'bool': bool,
+                'boolean': bool,
+            }
+            
+            new_type = type_map.get(new_type_str.lower())
+            if new_type is None:
+                raise ValueError(f"Unsupported type: {new_type_str}")
+            
+            # Set the column type
+            col.type = new_type
+            
+            # CRITICAL: Convert the underlying data to match the new type
+            # This ensures that getTypedValue returns the correct type
+            _convert_column_data(col, self.sheet.rows)
+            
+            # Clear caches to force recomputation with new type
+            self._stats_cache.clear()
+            self._sample_rows = None
+
+    def rename_column(self, old_name: str, new_name: str) -> None:
+        """
+        Rename a column in the dataset.
+        
+        Updates the VisiData sheet's column name and clears caches
+        to ensure the change is reflected in all subsequent operations.
+        
+        Args:
+            old_name: Current column name
+            new_name: New column name
+            
+        Raises:
+            ValueError: If old column not found or new name already exists
+        """
+        with self._lock:
+            # Validate new name is not empty
+            if not new_name or not new_name.strip():
+                raise ValueError("New column name cannot be empty")
+            
+            new_name = new_name.strip()
+            
+            # Check if new name already exists (case-sensitive)
+            if any(c.name == new_name for c in self.sheet.columns):
+                raise ValueError(f"Column '{new_name}' already exists")
+            
+            # Find the column by old name
+            col = next((c for c in self.sheet.columns if c.name == old_name), None)
+            if col is None:
+                raise ValueError(f"Column '{old_name}' not found")
+            
+            # Update the column name
+            col.name = new_name
+            
+            # Clear caches to force refresh
+            self._stats_cache.clear()
+            self._sample_rows = None
+
     def get_state(self) -> dict[str, Any]:
         """
         Get current sort and filter state.

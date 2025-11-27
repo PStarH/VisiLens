@@ -57,13 +57,19 @@ export const HeaderStats = React.memo(function HeaderStats({
     
     // OPTIMIZATION: Check cache first - if hit, show immediately without network request
     const cached = getCachedStats(columnName);
-    if (cached) {
+    
+    // CRITICAL: Invalidate cache if column type changed (e.g., user changed string to int)
+    // The cached stats were calculated with the old type, so they're stale
+    if (cached && cached.type !== columnType.toLowerCase()) {
+      console.log(`[HeaderStats] Type mismatch for ${columnName}: cached=${cached.type}, current=${columnType} - invalidating cache`);
+      // Don't use cached stats, fall through to fetch new ones
+    } else if (cached) {
       setStats(cached);
       setIsOpen(true);
       return; // Early return prevents any WebSocket request
     }
     
-    // CACHE MISS: Clear any existing timer first
+    // CACHE MISS or TYPE MISMATCH: Clear any existing timer first
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
@@ -114,7 +120,7 @@ export const HeaderStats = React.memo(function HeaderStats({
           <div className="mb-3 flex items-center justify-between border-b border-slate-700 pb-2">
             <span className="font-semibold text-slate-200">{columnName}</span>
             <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300 uppercase">
-              {stats?.type || columnType}
+              {columnType}
             </span>
           </div>
 
