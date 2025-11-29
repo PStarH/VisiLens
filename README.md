@@ -16,6 +16,12 @@
   [![React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](https://reactjs.org/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
   [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/)
+  
+  <!-- Growth Badges -->
+  [![GitHub stars](https://img.shields.io/github/stars/PStarH/VisiLens.svg?style=social&label=Star&maxAge=2592000)](https://github.com/PStarH/VisiLens/stargazers/)
+  [![GitHub forks](https://img.shields.io/github/forks/PStarH/VisiLens.svg?style=social&label=Fork&maxAge=2592000)](https://github.com/PStarH/VisiLens/network/)
+  [![GitHub watchers](https://img.shields.io/github/watchers/PStarH/VisiLens.svg?style=social&label=Watch&maxAge=2592000)](https://github.com/PStarH/VisiLens/watchers/)
+  [![GitHub issues](https://img.shields.io/github/issues/PStarH/VisiLens.svg)](https://github.com/PStarH/VisiLens/issues)
 
   [English](README.md) • [简体中文](DOCUMENTATION/README_zh.md) • [Español](DOCUMENTATION/README_es.md) • [日本語](DOCUMENTATION/README_ja.md) • [Русский](DOCUMENTATION/README_ru.md)
 
@@ -263,6 +269,26 @@ See [DOCUMENTATION/](DOCUMENTATION/) for existing translations.
 We welcome contributions of all kinds! Whether it's fixing a bug, improving documentation, or adding a new feature.
  
 👉 **[Read our Contributing Guide](DOCUMENTATION/CONTRIBUTING.md)** to get started.
+ 
+## 💬 Community & Support
+ 
+Join the conversation! We want to hear your feedback and ideas.
+ 
+*   **[GitHub Discussions](https://github.com/PStarH/VisiLens/discussions):** The best place for Q&A, feature requests, and showing off what you've built.
+*   **[Issues](https://github.com/PStarH/VisiLens/issues):** Report bugs or suggest specific enhancements.
+ 
+## ✨ Contributors
+ 
+Thanks goes to these wonderful people:
+ 
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<!-- markdownlint-enable -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+ 
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
 
 ### For Contributors: where things live
 
