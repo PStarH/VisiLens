@@ -262,8 +262,9 @@ We welcome contributions of all kinds! Whether it's fixing a bug, improving docu
  
 ## 💬 Community & Support
  
-Join the conversation! We want to hear your feedback and ideas.
+We'd love to hear from you!
  
+*   **⭐ [Star us on GitHub](https://github.com/PStarH/VisiLens):** If you find VisiLens useful, please give us a star! It helps us reach more developers.
 *   **[GitHub Discussions](https://github.com/PStarH/VisiLens/discussions):** The best place for Q&A, feature requests, and showing off what you've built.
 *   **[Issues](https://github.com/PStarH/VisiLens/issues):** Report bugs or suggest specific enhancements.
  
@@ -299,16 +300,24 @@ Thanks goes to these wonderful people:
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
 
 ### For Contributors: where things live
-
+ 
+<details>
+<summary>Click to expand technical details</summary>
+ 
 - **Python package (`vdweb/`):** This is the installable package published to PyPI as `vdweb`. The CLI entrypoints `visilens` and `vdweb` both resolve to `vdweb.cli:main` as configured in `pyproject.toml`.
 - **Dev backend (`backend/`):** A separate FastAPI app used only for local development (`uvicorn backend.main:app`). It mirrors the behavior of the packaged backend but is not what users import when they install `visilens`.
 - **Core logic:** The VisiData-powered data access layer lives in `vdweb/core.py` (and is mirrored in `backend/core.py` for the dev app). If you want to change how data is loaded/sorted/filtered, start here.
-
-### Typical contributor workflow
-
+ 
+#### Typical contributor workflow
+ 
 1. Edit backend / core logic in `vdweb/` (and update `backend/` if needed for dev parity).
 2. Run the dev backend + frontend locally as described in [Development](#-development).
 3. If you change the React app and want those changes to ship, run `npm run build` in `frontend/` so the bundle that will be copied into `vdweb/static/` is up to date.
+</details>
+ 
+## 📈 Star History
+ 
+[![Star History Chart](https://api.star-history.com/svg?repos=PStarH/VisiLens&type=Date)](https://star-history.com/#PStarH/VisiLens&Date)
 
 ## 📄 License
 
