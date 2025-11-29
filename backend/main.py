@@ -1,11 +1,3 @@
-"""
-VisiLens FastAPI Backend
-
-A minimal REST API exposing VisiData's data loading and querying
-capabilities. The browser is just a renderer - all logic lives here.
-Now with WebSocket support for real-time data exploration.
-"""
-
 from __future__ import annotations
 
 import asyncio

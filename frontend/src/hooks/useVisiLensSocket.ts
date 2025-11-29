@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { type FilterPayload } from '../components/FilterBar';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -291,7 +292,7 @@ export function useVisiLensSocket() {
     }
   }, []);
 
-  const applyFilter = useCallback((payload: any) => {
+  const applyFilter = useCallback((payload: FilterPayload | "reset") => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         action: 'apply_filter',

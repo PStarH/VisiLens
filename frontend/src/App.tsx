@@ -40,7 +40,9 @@ function App() {
 
   const handleResetFilter = () => {
     // Reset filter
-    socket.applyFilter && socket.applyFilter("reset");
+    if (socket.applyFilter) {
+      socket.applyFilter("reset");
+    }
   };
 
   return (

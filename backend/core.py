@@ -1,11 +1,3 @@
-"""
-VisiData Core Wrapper Module
-
-This module wraps VisiData's internal API for programmatic use,
-without launching the TUI. All data operations (loading, filtering,
-sorting) happen here - the browser is just a renderer.
-"""
-
 from __future__ import annotations
 
 import collections

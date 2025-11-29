@@ -1,15 +1,7 @@
-# VisiLens Backend Dependencies
-# Core framework
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
-
-# Data engine - VisiData handles 50+ file formats
 visidata>=3.0
-
-# Pydantic for data validation (FastAPI dependency)
 pydantic>=2.0
-
-# Optional: Additional format support
-# pandas>=2.0  # For Parquet, Excel via pandas adapter
-# openpyxl>=3.1  # For .xlsx files
-# pyarrow>=14.0  # For Parquet files
+pandas>=2.0  # For Parquet, Excel via pandas adapter
+openpyxl>=3.1  # For .xlsx files
+pyarrow>=14.0
