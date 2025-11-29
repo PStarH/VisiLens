@@ -43,6 +43,16 @@ This section guides you through submitting an enhancement suggestion for VisiLen
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why.
 - **Include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to.
 
+### Contributing Translations
+
+We want VisiLens to be accessible to everyone! If you notice a typo in a translation or want to add a new language:
+
+1.  Check the `DOCUMENTATION/` folder for existing translations.
+2.  Copy `README.md` to `DOCUMENTATION/README_<lang_code>.md`.
+3.  Translate the content.
+4.  Add a link to your new translation in the main `README.md`.
+5.  Submit a Pull Request!
+
 ### Your First Code Contribution
 
 1.  **Fork the repository** on GitHub.

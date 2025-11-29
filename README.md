@@ -5,9 +5,9 @@
 
   **Excel for Developers**
 
-  > **Open 1M+ rows in seconds. Local, fast, simple.**
+  > **Open 1M+ rows in seconds. Local-first, zero-config, instant preview.**
   
-  A high-performance, local-first web GUI for exploring datasets. Instantly view and filter CSV, Parquet, Excel, and JSON files using the power of [VisiData](https://www.visidata.org/).
+  A high-performance, **local-first** web GUI for exploring datasets. Instantly view, filter, and analyze CSV, Parquet, Excel, and JSON files using the power of [VisiData](https://www.visidata.org/) without installing heavy spreadsheet software.
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -19,13 +19,24 @@
 
   [English](README.md) • [简体中文](DOCUMENTATION/README_zh.md) • [Español](DOCUMENTATION/README_es.md) • [日本語](DOCUMENTATION/README_ja.md) • [Русский](DOCUMENTATION/README_ru.md)
 
-  [Features](#features) • [Installation](#installation) • [Usage](#usage) • [Architecture](#architecture) • [Contributing](#contributing)
+  [Quickstart](#-quickstart) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Architecture](#-architecture) • [Contributing](#-contributing)
 </div>
 
 ---
 
-> **📦 Package Name Notice**  
-> The PyPI package name is **`vdweb`** (install with `pip install vdweb`), but you can use either `visilens` or `vdweb` as the command-line tool after installation. We recommend using `visilens` for consistency with the project name.
+## ⚡ Quickstart
+
+Get up and running in seconds. No database setup, no configuration.
+
+```bash
+# 1. Install via pip
+pip install visilens
+
+# 2. Open any file
+visilens data.csv
+```
+
+> **Note:** The PyPI package name is **`vdweb`**, but the CLI tool is **`visilens`**.
 
 ---
 
@@ -34,8 +45,8 @@
 Data exploration shouldn't require writing boilerplate Pandas code or waiting for heavy spreadsheet software like Excel to load. **VisiLens** is a modern **CSV viewer** and **Parquet explorer** that combines the raw speed of **VisiData** with a lightweight web interface.
 
 - **⚡️ Load 1M rows in under 2 seconds:** Powered by VisiData's highly optimized engine.
-- **🔒 All local:** Your data never leaves your machine. No cloud uploads.
-- **🛠 Zero config:** CLI-first workflow. Pipe data in, explore, and get back to coding.
+- **🔒 Local-First & Secure:** Your data never leaves your machine. No cloud uploads, no external dependencies.
+- **🛠 Zero Config:** CLI-first workflow. Pipe data in, explore, and get back to coding.
 - **🔌 Universal Support:** Open CSV, TSV, JSON, Parquet, Excel, SQLite, and [50+ other formats](https://www.visidata.org/formats/).
 
 ## ✨ Features
@@ -111,14 +122,45 @@ Once launched, VisiLens opens in your default browser (usually `http://localhost
 5.  **Load New Data:** (Coming Soon) Drag and drop files directly into the window.
 
 ## 🏗 Architecture
-
+ 
 VisiLens is built on a robust modern stack designed for performance:
-
+ 
 *   **Backend:** FastAPI server bridges VisiData and the browser.
 *   **Communication:** WebSockets stream slices on demand.
 *   **Frontend:** React grid renders only what you see.
+ 
+```mermaid
+graph TD
+    subgraph "Local Machine"
+        User[User] -->|CLI Command| CLI[visilens data.csv]
+        CLI -->|Spawns| Server[FastAPI Server]
+        Server -->|Loads| VisiData[VisiData Engine]
+        VisiData -->|Reads| File[Local File (CSV/Parquet/etc)]
+        
+        subgraph "Browser"
+            UI[React Frontend] -->|WebSocket| Server
+            Server -->|Stream Data| UI
+        end
+    end
+```
 
-![Architecture Diagram](https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/diagram.png)
+### 📂 Project Structure
+
+A quick look at the codebase to help you navigate:
+
+```
+VisiLens/
+├── vdweb/               # 📦 The Python Package (PyPI)
+│   ├── cli.py           #    Entry point (visilens command)
+│   ├── core.py          #    VisiData integration logic
+│   └── static/          #    Compiled frontend assets
+├── backend/             # 🛠 Development Backend
+│   └── main.py          #    FastAPI app for local dev
+├── frontend/            # ⚛️ React Frontend
+│   ├── src/             #    Source code
+│   └── vite.config.ts   #    Build configuration
+└── DOCUMENTATION/       # 📚 Multi-language docs & guides
+```
 
 ## 🗺 Roadmap
 
@@ -196,9 +238,31 @@ Want to contribute? Great! Here's how to set up the development environment.
   visilens path/to/data.csv
   ```
 
+## ❓ FAQ
+ 
+**Q: Why is the package named `vdweb` but the command is `visilens`?**  
+A: The project started as `vdweb` (VisiData Web). We rebranded to **VisiLens** to better reflect our vision. We kept the package name `vdweb` on PyPI to avoid breaking existing installs, but we recommend using the `visilens` command.
+ 
+**Q: Can I use this on a remote server?**  
+A: Yes! You can run `visilens data.csv --port 8080 --no-browser` on a remote server and access it via SSH tunneling or directly if the port is exposed.
+ 
+**Q: Does it support editing data?**  
+A: Currently, VisiLens is primarily for **exploration and analysis**. Basic cell editing is on our roadmap.
+ 
+## 🌍 Help Us Improve Translations!
+ 
+VisiLens is used globally, and we want to make it accessible to everyone. Our documentation is currently available in English, Chinese, Spanish, Japanese, and Russian, but we need your help to keep them accurate!
+ 
+*   **Found a typo?** Please submit a PR!
+*   **Want to add a new language?** We'd love to support it.
+ 
+See [DOCUMENTATION/](DOCUMENTATION/) for existing translations.
+ 
 ## 🤝 Contributing
-
-For more details, please see [CONTRIBUTING.md](DOCUMENTATION/CONTRIBUTING.md).
+ 
+We welcome contributions of all kinds! Whether it's fixing a bug, improving documentation, or adding a new feature.
+ 
+👉 **[Read our Contributing Guide](DOCUMENTATION/CONTRIBUTING.md)** to get started.
 
 ### For Contributors: where things live
 
