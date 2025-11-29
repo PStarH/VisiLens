@@ -38,6 +38,49 @@ Making it easier to drill down into data without writing regex.
 ### Export Selected Rows
 - **Goal:** Checkbox selection for rows, then a button to "Export Selected" to JSON or CSV.
 
+## Advanced Data Cleaning
+
+Going beyond basic type casting and renaming to full dataset hygiene.
+
+### Fill Null Values
+- **Goal:** Right-click a column -> "Fill Nulls" -> Options: "With 0", "With Previous Value", "With Mean/Mode", or "Custom Value".
+- **Why:** Essential for preparing data for analysis or export.
+
+### Search and Replace
+- **Goal:** `Ctrl+F` style interface to find and replace text within a column or the entire dataset. Support for regex.
+
+### Deduplication
+- **Goal:** "Remove Duplicate Rows" action, with options to select which columns to consider for uniqueness.
+
+## VisiData Parity
+
+Bringing the power of VisiData's advanced data manipulation to the web.
+
+### Join Sheets
+- **Goal:** UI to join two open sheets based on a common key column (Inner, Left, Right, Outer joins).
+
+### Pivot Tables
+- **Goal:** Drag-and-drop interface to create pivot tables (Rows, Columns, Values) from the current dataset.
+
+### Melt/Unpivot
+- **Goal:** Transform wide data into long format (and vice versa) with a simple wizard.
+
+### Computed Columns
+- **Goal:** Add new columns based on Python expressions involving other columns (e.g., `col_a + col_b * 100`).
+
+## GUI Enhancements
+
+Making the application feel like a native, premium tool.
+
+### Theme Customization
+- **Goal:** User-selectable themes (Dark, Light, High Contrast, Custom Colors).
+
+### Better Keyboard Navigation
+- **Goal:** Full keyboard control for power users (Vim-style bindings option), ensuring every action is accessible without a mouse.
+
+### Responsive Design
+- **Goal:** Better layout adaptation for smaller screens and tablets, including collapsible sidebars and touch-friendly controls.
+
 ---
 
 ## Technical Implementation Notes
