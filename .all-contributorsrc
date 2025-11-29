@@ -1,0 +1,30 @@
+{
+  "projectName": "VisiLens",
+  "projectOwner": "PStarH",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 32,
+  "commit": true,
+  "commitConvention": "eslint",
+  "contributors": [
+    {
+      "login": "PStarH",
+      "name": "Xinghan Pan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/176644217?v=4",
+      "profile": "https://pstarh.github.io/website",
+      "contributions": [
+        "code",
+        "doc",
+        "design",
+        "ideas",
+        "infra",
+        "maintenance"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7,
+  "linkToUsage": true
+}
