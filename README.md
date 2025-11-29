@@ -131,27 +131,14 @@ Once launched, VisiLens opens in your default browser (usually `http://localhost
 5.  **Load New Data:** (Coming Soon) Drag and drop files directly into the window.
 
 ## 🏗 Architecture
- 
+
 VisiLens is built on a robust modern stack designed for performance:
- 
+
 *   **Backend:** FastAPI server bridges VisiData and the browser.
 *   **Communication:** WebSockets stream slices on demand.
 *   **Frontend:** React grid renders only what you see.
- 
-```mermaid
-graph TD
-    subgraph "Local Machine"
-        User[User] -->|CLI Command| CLI[visilens data.csv]
-        CLI -->|Spawns| Server[FastAPI Server]
-        Server -->|Loads| VisiData[VisiData Engine]
-        VisiData -->|Reads| File[Local File (CSV/Parquet/etc)]
-        
-        subgraph "Browser"
-            UI[React Frontend] -->|WebSocket| Server
-            Server -->|Stream Data| UI
-        end
-    end
-```
+
+![Architecture Diagram](https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/diagram.png)
 
 ### 📂 Project Structure
 
