@@ -22,6 +22,11 @@
   [Características](#características) • [Instalación](#instalación) • [Uso](#uso) • [Arquitectura](#arquitectura) • [Contribución](#contribución)
 </div>
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/demo.gif" alt="VisiLens Demo" width="100%" />
+</div>
+
+
 ---
 
 ## 🚀 ¿Por qué VisiLens?

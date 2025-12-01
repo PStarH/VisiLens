@@ -22,6 +22,11 @@
   [特性](#特性) • [安装](#安装) • [使用](#使用) • [架构](#架构) • [贡献](#贡献)
 </div>
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/demo.gif" alt="VisiLens Demo" width="100%" />
+</div>
+
+
 ---
 
 > **📦 包名说明**  

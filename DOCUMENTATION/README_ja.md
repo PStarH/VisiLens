@@ -22,6 +22,11 @@
   [機能](#機能) • [インストール](#インストール) • [使い方](#使い方) • [アーキテクチャ](#アーキテクチャ) • [貢献](#貢献)
 </div>
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/demo.gif" alt="VisiLens Demo" width="100%" />
+</div>
+
+
 ---
 
 ## 🚀 VisiLensを選ぶ理由
