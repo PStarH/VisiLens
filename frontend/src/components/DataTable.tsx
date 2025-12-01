@@ -506,7 +506,21 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                 getCachedStats={getCachedStats}
                 disabled={editingColumn === col.name}
               >
-                <div className="flex items-center px-4 w-full h-full">
+                <div 
+                  className="flex items-center px-4 w-full h-full cursor-pointer"
+                  onClick={() => {
+                    if (editingColumn !== col.name) {
+                      const ascending = isSorted ? !isAscending : true;
+                      sortColumn(col.name, ascending);
+                    }
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (editingColumn !== col.name) {
+                      setEditingColumn(col.name);
+                    }
+                  }}
+                >
                   {editingColumn === col.name ? (
                     <input
                       autoFocus
@@ -524,17 +538,7 @@ export function DataTable({ socket }: { socket: ReturnType<typeof useVisiLensSoc
                     />
                   ) : (
                     <div className="flex w-full items-center justify-between gap-2">
-                      <div
-                        className="flex min-w-0 cursor-pointer flex-col gap-0.5"
-                        onClick={() => {
-                          const ascending = isSorted ? !isAscending : true;
-                          sortColumn(col.name, ascending);
-                        }}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setEditingColumn(col.name);
-                        }}
-                      >
+                      <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="truncate text-left">{col.name}</span>
                         <span className="text-left text-[10px] font-normal lowercase text-secondary/50">
                           {col.type}
