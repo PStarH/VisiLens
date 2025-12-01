@@ -31,6 +31,10 @@
   [Quickstart](#-quickstart) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Architecture](#-architecture) • [Contributing](#-contributing)
 </div>
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/demo.gif" alt="VisiLens Demo" width="100%" />
+</div>
+
 ---
 
 ## ⚡ Quickstart
