@@ -3,7 +3,7 @@
 [![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
   <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/banner.svg" alt="VisiLens Logo" width="100%" />
-</div>  
+  
   # VisiLens
 
   **Excel for Developers**
@@ -29,7 +29,7 @@
   [English](README.md) • [简体中文](DOCUMENTATION/README_zh.md) • [Español](DOCUMENTATION/README_es.md) • [日本語](DOCUMENTATION/README_ja.md) • [Русский](DOCUMENTATION/README_ru.md)
 
   [Quickstart](#-quickstart) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Architecture](#-architecture) • [Contributing](#-contributing)
-
+</div>
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/demo.gif" alt="VisiLens Demo" width="100%" />
