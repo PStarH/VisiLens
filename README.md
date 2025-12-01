@@ -1,6 +1,4 @@
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
+
 <div align="center">
   <img src="https://raw.githubusercontent.com/PStarH/VisiLens/main/assets/banner.svg" alt="VisiLens Logo" width="100%" />
   
@@ -27,6 +25,9 @@
   [![GitHub forks](https://img.shields.io/github/forks/PStarH/VisiLens.svg?style=social&label=Fork&maxAge=2592000)](https://github.com/PStarH/VisiLens/network/)
   [![GitHub watchers](https://img.shields.io/github/watchers/PStarH/VisiLens.svg?style=social&label=Watch&maxAge=2592000)](https://github.com/PStarH/VisiLens/watchers/)
   [![GitHub issues](https://img.shields.io/github/issues/PStarH/VisiLens.svg)](https://github.com/PStarH/VisiLens/issues)
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
   [English](README.md) • [简体中文](DOCUMENTATION/README_zh.md) • [Español](DOCUMENTATION/README_es.md) • [日本語](DOCUMENTATION/README_ja.md) • [Русский](DOCUMENTATION/README_ru.md)
 
