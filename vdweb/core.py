@@ -8,6 +8,7 @@ sorting) happen here - the browser is just a renderer.
 
 from __future__ import annotations
 
+import logging
 import collections
 import math
 import threading
@@ -17,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 import visidata
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -257,19 +260,15 @@ class DatasetHandle:
         Apply a structured filter to the dataset.
 
         Args:
-            filter_payload: Dict with 'column', 'operator', 'value'
+            filter_payload: Dict with either:
+                - Single condition: {'column', 'operator', 'value'}
+                - Multiple conditions: {'type': 'basic', 'conditions': [...]}
         """
         with self._lock:
+            logger.info(f"Applying structured filter: {filter_payload}")
             # Reset if payload is None or "reset"
             if not filter_payload or filter_payload == "reset":
                 self.clear_filter()
-                return
-
-            column_name = filter_payload.get("column")
-            operator = filter_payload.get("operator")
-            value = filter_payload.get("value")
-
-            if not column_name or not operator:
                 return
 
             # Store original rows if this is the first operation
@@ -283,74 +282,171 @@ class DatasetHandle:
             if hasattr(self.sheet, 'selected'):
                 self.sheet.selected = []
 
-            col = next((c for c in self.sheet.columns if c.name == column_name), None)
-            if col is None:
-                raise ValueError(f"Column '{column_name}' not found")
-
-            # Determine target type for casting
-            col_type_name = _get_type_name(col.type)
-            is_numeric = col_type_name in ('float', 'integer', 'currency')
-
-            # Helper to cast value safely
-            def safe_cast(val, to_type):
-                try:
-                    if to_type == 'float':
-                        return float(val)
-                    elif to_type == 'int':
-                        return int(val)
-                    elif to_type == 'str':
-                        return str(val)
-                    return val
-                except (ValueError, TypeError):
-                    return val
-
-            # Cast the filter value
-            target_val = safe_cast(value, 'float' if is_numeric else 'str')
-
-            rows_to_select = []
-            for row in self.sheet.rows:
-                try:
-                    cell_val = col.getTypedValue(row)
+            # Check if this is a multi-condition filter
+            conditions = filter_payload.get("conditions")
+            if conditions and isinstance(conditions, list):
+                # Multi-condition filter (AND logic)
+                rows_to_select = []
+                
+                # Preprocess all conditions
+                condition_data = []
+                for cond in conditions:
+                    column_name = cond.get("column")
+                    operator = cond.get("operator")
+                    value = cond.get("value")
                     
-                    # Handle None/Empty
-                    if cell_val is None:
-                        if operator == 'is_empty':
+                    if not column_name or not operator:
+                        continue
+                    
+                    col = next((c for c in self.sheet.columns if c.name == column_name), None)
+                    if col is None:
+                        continue
+                    
+                    col_type_name = _get_type_name(col.type)
+                    is_numeric = col_type_name in ('float', 'integer', 'currency')
+                    
+                    # Cast value
+                    target_val = self._safe_cast(value, 'float' if is_numeric else 'str')
+                    
+                    logger.info(f"Filter condition: col={column_name}, op={operator}, val={value} -> target={target_val} (numeric={is_numeric})")
+
+                    condition_data.append({
+                        'col': col,
+                        'operator': operator,
+                        'target_val': target_val,
+                        'is_numeric': is_numeric
+                    })
+                
+                # Apply all conditions (AND logic)
+                for row in self.sheet.rows:
+                    all_match = True
+                    for cond_info in condition_data:
+                        try:
+                            cell_val = cond_info['col'].getTypedValue(row)
+                            
+                            # Handle None/Empty
+                            if cell_val is None:
+                                if cond_info['operator'] == 'is_empty':
+                                    continue  # This condition passed
+                                else:
+                                    all_match = False
+                                    break
+                            
+                            # Check this condition
+                            match = self._evaluate_condition(
+                                cell_val,
+                                cond_info['operator'],
+                                cond_info['target_val'],
+                                cond_info['is_numeric']
+                            )
+                            
+                            if not match:
+                                all_match = False
+                                break
+                        except Exception:
+                            all_match = False
+                            break
+                    
+                    if all_match:
+                        rows_to_select.append(row)
+                
+                self.sheet.rows = rows_to_select
+                self._current_filter = ("multiple", f"{len(conditions)} conditions")
+                
+            else:
+                # Single condition filter (legacy)
+                column_name = filter_payload.get("column")
+                operator = filter_payload.get("operator")
+                value = filter_payload.get("value")
+
+                if not column_name or not operator:
+                    return
+
+                col = next((c for c in self.sheet.columns if c.name == column_name), None)
+                if col is None:
+                    raise ValueError(f"Column '{column_name}' not found")
+
+                # Determine target type for casting
+                col_type_name = _get_type_name(col.type)
+                is_numeric = col_type_name in ('float', 'integer', 'currency')
+
+                # Cast the filter value
+                target_val = self._safe_cast(value, 'float' if is_numeric else 'str')
+
+                rows_to_select = []
+                for row in self.sheet.rows:
+                    try:
+                        cell_val = col.getTypedValue(row)
+                        
+                        # Handle None/Empty
+                        if cell_val is None:
+                            if operator == 'is_empty':
+                                rows_to_select.append(row)
+                            continue
+
+                        # Check condition
+                        match = self._evaluate_condition(cell_val, operator, target_val, is_numeric)
+                        if match:
                             rows_to_select.append(row)
+
+                    except Exception:
                         continue
 
-                    # Comparison Logic
-                    match = False
-                    if operator == 'eq':
-                        match = cell_val == target_val
-                    elif operator == 'neq':
-                        match = cell_val != target_val
-                    elif operator == 'gt':
-                        if is_numeric and isinstance(cell_val, (int, float)):
-                            match = cell_val > target_val
-                    elif operator == 'lt':
-                        if is_numeric and isinstance(cell_val, (int, float)):
-                            match = cell_val < target_val
-                    elif operator == 'contains':
-                        match = str(target_val).lower() in str(cell_val).lower()
-                    elif operator == 'is_empty':
-                        match = cell_val == ""
-
-                    if match:
-                        rows_to_select.append(row)
-
-                except Exception:
-                    continue
-
-            # Use VisiData API to select rows
-            if hasattr(self.sheet, 'select'):
-                self.sheet.select(rows_to_select)
+                # Use VisiData API to select rows
+                if hasattr(self.sheet, 'select'):
+                    self.sheet.select(rows_to_select)
+                
+                # Filter to show only selected
+                self.sheet.rows = rows_to_select
+                
+                self._current_filter = (column_name, f"{operator} {value}")
             
-            # Filter to show only selected (equivalent to sheet.only_selected())
-            self.sheet.rows = rows_to_select
-            
-            self._current_filter = (column_name, f"{operator} {value}")
             self._stats_cache.clear()
             self._sample_rows = None
+
+    def _safe_cast(self, val, to_type):
+        """Helper to cast value safely."""
+        try:
+            if to_type == 'float':
+                return float(val)
+            elif to_type == 'int':
+                return int(val)
+            elif to_type == 'str':
+                return str(val)
+            return val
+        except (ValueError, TypeError):
+            return val
+
+    def _evaluate_condition(self, cell_val, operator, target_val, is_numeric):
+        """Evaluate a single filter condition."""
+        try:
+            if operator == 'eq':
+                return cell_val == target_val
+            elif operator == 'neq':
+                return cell_val != target_val
+            elif operator == 'gt':
+                if is_numeric and isinstance(cell_val, (int, float)) and isinstance(target_val, (int, float)):
+                    return cell_val > target_val
+                if not is_numeric and isinstance(cell_val, str) and isinstance(target_val, str):
+                    return cell_val > target_val
+                return False
+            elif operator == 'lt':
+                if is_numeric and isinstance(cell_val, (int, float)) and isinstance(target_val, (int, float)):
+                    return cell_val < target_val
+                if not is_numeric and isinstance(cell_val, str) and isinstance(target_val, str):
+                    return cell_val < target_val
+                return False
+            elif operator == 'contains':
+                return str(target_val).lower() in str(cell_val).lower()
+            elif operator == 'regex_match':
+                import re
+                return bool(re.search(str(target_val), str(cell_val), re.IGNORECASE))
+            elif operator == 'is_empty':
+                return cell_val == "" or cell_val is None
+            return False
+        except Exception as e:
+            logger.warning(f"Error evaluating condition: {e}")
+            return False
 
     def clear_filter(self) -> None:
         """
