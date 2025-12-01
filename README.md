@@ -18,8 +18,10 @@
   [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
   [![React](https://img.shields.io/badge/Frontend-React-61DAFB.svg)](https://reactjs.org/)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
-  [![PyPI](https://img.shields.io/pypi/v/vdweb.svg)](https://pypi.org/project/vdweb/)
-  
+  <a href="https://pypi.org/project/vdweb/">
+    <img src="https://img.shields.io/pypi/v/vdweb.svg" alt="PyPI version" />
+  </a>
+
   <!-- Growth Badges -->
   [![GitHub stars](https://img.shields.io/github/stars/PStarH/VisiLens.svg?style=social&label=Star&maxAge=2592000)](https://github.com/PStarH/VisiLens/stargazers/)
   [![GitHub forks](https://img.shields.io/github/forks/PStarH/VisiLens.svg?style=social&label=Fork&maxAge=2592000)](https://github.com/PStarH/VisiLens/network/)
